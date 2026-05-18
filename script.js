@@ -1302,8 +1302,8 @@ const films = [
     director: "Arthur Benzaquen", cast: ["Kev Adams", "Jean-Paul Rouve", "Vanessa Guide", "William Lebghil", "Éric Métayer"],
     poster: "posters/344268.jpg", url: "#", time: "1h32", year: 2015 },
 
-  { title: "Les 10 Commandements", genre: ["Comédie"],
-    director: "Cecil B. DeMille", cast: ["Charlton Heston", "Yul Brynner", "Anne Baxter", "Edward G. Robinson", "Yvonne De Carlo"],
+  { title: "Les 11 Commandements", genre: ["Comédie"],
+    director: "Michaël Youn", cast: ["Michaël Youn", "Yvonne De Carlo"],
     poster: "posters/68355.jpg", url: "#", time: "3h40", year: 1956 },
 
   { title: "Fatal Bazooka", genre: ["Comédie", "Musical"],
