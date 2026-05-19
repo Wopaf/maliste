@@ -11,6 +11,24 @@
 </head>
 <body>
 
+  <!-- ── Loader ── -->
+  <div id="page-loader" class="page-loader">
+    <div class="loader-spinner"></div>
+  </div>
+
+  <!-- ── Écran de connexion ── -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-box">
+      <p class="auth-app-name">Mes Films & Séries</p>
+      <p class="auth-mode-label" id="auth-mode-label">Connexion</p>
+      <input type="email" id="auth-email" placeholder="Email" class="auth-input" autocomplete="email" />
+      <input type="password" id="auth-password" placeholder="Mot de passe" class="auth-input" autocomplete="current-password" />
+      <p class="auth-error" id="auth-error"></p>
+      <button class="auth-submit" id="auth-submit">Se connecter</button>
+      <button class="auth-switch" id="auth-switch">Créer un compte</button>
+    </div>
+  </div>
+
   <div class="sticky-top">
   <header>
     <div class="controls">
@@ -68,18 +86,48 @@
         </button>
         <ul class="dropdown-list"></ul>
       </div>
-<button id="layout-toggle" class="layout-toggle" title="Vue compacte">
-        <svg class="icon-normal" width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
-          <rect x="0" y="0" width="4" height="15" rx="1"/>
-          <rect x="5.5" y="0" width="4" height="15" rx="1"/>
-          <rect x="11" y="0" width="4" height="15" rx="1"/>
-        </svg>
-        <svg class="icon-compact" width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
-          <rect x="0" y="0" width="15" height="4" rx="1"/>
-          <rect x="0" y="5.5" width="15" height="4" rx="1"/>
-          <rect x="0" y="11" width="15" height="4" rx="1"/>
-        </svg>
+      </div>
+    </div>
+    <!-- Bouton utilisateur -->
+    <div class="user-area" id="user-area">
+      <button class="user-btn" id="user-btn">
+        <img class="user-btn-avatar" id="user-btn-avatar" style="display:none" alt="" />
+        <span class="user-initials" id="user-initials"></span>
       </button>
+      <div class="user-menu" id="user-menu">
+        <div class="user-menu-header">
+          <div class="user-menu-profile-top">
+            <button class="user-menu-avatar-btn" id="user-menu-avatar-btn" title="Changer l'avatar">
+              <img class="user-menu-avatar-img" id="user-menu-avatar-img" style="display:none" alt="" />
+              <span class="user-menu-avatar-initial" id="user-menu-avatar-initial"></span>
+              <div class="user-menu-avatar-overlay">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </div>
+            </button>
+            <div class="user-menu-profile-info">
+              <div class="user-pseudo-row" id="user-pseudo-row">
+                <span class="user-pseudo-text" id="user-pseudo-display"></span>
+                <button class="user-pseudo-edit-btn" id="user-pseudo-edit-btn" title="Modifier le pseudo">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+              </div>
+              <div class="user-pseudo-editing" id="user-pseudo-editing" style="display:none">
+                <input type="text" id="user-pseudo-input" class="user-pseudo-input" maxlength="24" autocomplete="off" />
+                <button class="user-pseudo-save" id="user-pseudo-save">✓</button>
+              </div>
+              <span class="user-menu-email" id="user-menu-email"></span>
+            </div>
+          </div>
+          <div class="avatar-picker" id="avatar-picker" style="display:none">
+            <p class="avatar-picker-label">Choisir une affiche</p>
+            <div class="avatar-picker-grid" id="avatar-picker-grid"></div>
+          </div>
+        </div>
+        <a class="user-menu-edit" href="#" id="edit-lists-link">Éditer mes listes</a>
+        <button class="user-menu-item user-menu-compact" id="layout-toggle">Vue compacte</button>
+        <button class="user-menu-item" id="profiles-open-btn">Communauté</button>
+        <div class="user-menu-separator"></div>
+        <button class="user-menu-logout" id="logout-btn">Se déconnecter</button>
       </div>
     </div>
     </div>
@@ -88,6 +136,10 @@
   <div class="grid-info">
     <span id="result-count" class="badge"></span>
     <span id="time-count" class="badge"></span>
+  </div>
+  <div id="viewing-banner" class="viewing-banner">
+    <span>Liste de <strong class="viewing-banner-name"></strong></span>
+    <button id="back-my-list-btn" class="viewing-banner-back">← Ma liste</button>
   </div>
   </div>
 
@@ -129,7 +181,163 @@
     </div>
   </div>
 
+  <!-- ── Modal profils ── -->
+  <div id="profiles-modal" class="profiles-modal">
+    <div class="profiles-modal-inner">
+      <div class="profiles-modal-header">
+        <p class="profiles-modal-title">Communauté</p>
+        <button class="profiles-modal-close" id="profiles-modal-close">✕</button>
+      </div>
+      <div class="profiles-list" id="profiles-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── Panneau admin (overlay plein écran) ── -->
+  <div id="admin-panel" class="hidden">
+
+    <header class="admin-header">
+      <button class="btn-ghost btn-back" id="admin-back-btn" title="Retour" style="display:flex;align-items:center;gap:6px;">
+        <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="#e3e3e3"><path d="m142-480 294 294q15 15 14.5 35T435-116q-15 15-35 15t-35-15L57-423q-12-12-18-27t-6-30q0-15 6-30t18-27l308-308q15-15 35.5-14.5T436-844q15 15 15 35t-15 35L142-480Z"/></svg>
+        <span class="btn-back-label">Retour</span>
+      </button>
+      <div class="header-actions">
+<button class="btn-ghost" id="admin-add-btn" style="display:flex;align-items:center;gap:6px;">
+          <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#e3e3e3"><path d="M440-440H240q-17 0-28.5-11.5T200-480q0-17 11.5-28.5T240-520h200v-200q0-17 11.5-28.5T480-760q17 0 28.5 11.5T520-720v200h200q17 0 28.5 11.5T760-480q0 17-11.5 28.5T720-440H520v200q0 17-11.5 28.5T480-200q-17 0-28.5-11.5T440-240v-200Z"/></svg>
+          Ajouter
+        </button>
+        <button class="btn-primary" id="admin-save-btn" style="display:flex;align-items:center;gap:6px;">
+          <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#e3e3e3"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h447q16 0 30.5 6t25.5 17l114 114q11 11 17 25.5t6 30.5v447q0 33-23.5 56.5T760-120H200Zm560-526L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM280-560h280q17 0 28.5-11.5T600-600v-80q0-17-11.5-28.5T560-720H280q-17 0-28.5 11.5T240-680v80q0 17 11.5 28.5T280-560Zm-80-86v446-560 114Z"/></svg>
+          <span id="admin-save-label">Sauvegarder</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="tab-bar">
+      <nav class="admin-tabs">
+        <button class="a-tab active" data-tab="films">Films</button>
+        <button class="a-tab" data-tab="series">Séries</button>
+        <button class="a-tab" data-tab="anime">Animés</button>
+      </nav>
+      <div class="filter-bar">
+        <div class="search-bar" id="admin-search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="admin-filter" placeholder="Filtrer les entrées..." autocomplete="off" />
+          <button class="search-clear" id="admin-filter-clear" aria-label="Effacer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p id="admin-count-label" style="font-size:12px;color:#444;padding:10px 24px 0;"></p>
+    <div class="entry-list" id="entry-list"></div>
+
+    <!-- Confirmation suppression -->
+    <div class="admin-modal hidden" id="confirm-modal">
+      <div class="modal-box" style="max-width:380px;padding:24px;">
+        <p style="font-size:15px;font-weight:600;margin-bottom:6px;">Supprimer ce titre ?</p>
+        <p style="font-size:13px;color:#888;margin-bottom:20px;" id="confirm-modal-title"></p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn-ghost" id="confirm-cancel">Annuler</button>
+          <button class="btn-danger" id="confirm-ok">Supprimer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ajout / édition -->
+    <div class="admin-modal hidden" id="entry-modal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h2 id="modal-title-label">Ajouter</h2>
+          <button class="modal-close-btn" id="admin-modal-close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+
+          <div id="tmdb-section">
+            <div class="tmdb-bar">
+              <input type="text" id="tmdb-query" placeholder="Rechercher sur TMDB…" />
+              <button class="btn-ghost" id="tmdb-search-btn">Rechercher</button>
+            </div>
+            <div id="tmdb-results"></div>
+            <hr class="tmdb-divider" />
+          </div>
+
+          <form id="entry-form" autocomplete="off">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div class="form-row">
+                <div class="form-field">
+                  <label>Titre *</label>
+                  <input type="text" id="f-title" required />
+                </div>
+                <div class="form-field">
+                  <label>Année</label>
+                  <input type="number" id="f-year" min="1900" max="2099" />
+                </div>
+              </div>
+              <div class="form-field">
+                <label>Genres <span style="color:#444;font-weight:400;text-transform:none">(séparés par virgule)</span></label>
+                <input type="text" id="f-genre" placeholder="Action, Drame" />
+              </div>
+              <div class="form-field">
+                <label>Affiche (URL)</label>
+                <div class="poster-row">
+                  <input type="text" id="f-poster" placeholder="https://image.tmdb.org/…" />
+                  <img id="poster-preview" class="poster-preview hidden" alt="" />
+                </div>
+              </div>
+              <div id="film-fields">
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                  <div class="form-row">
+                    <div class="form-field">
+                      <label>Réalisateur</label>
+                      <input type="text" id="f-director" />
+                    </div>
+                    <div class="form-field">
+                      <label>Durée</label>
+                      <input type="text" id="f-time" placeholder="2h10" />
+                    </div>
+                  </div>
+                  <div class="form-field">
+                    <label>Casting <span style="color:#444;font-weight:400;text-transform:none">(séparés par virgule)</span></label>
+                    <input type="text" id="f-cast" placeholder="Acteur 1, Acteur 2, …" />
+                  </div>
+                </div>
+              </div>
+              <div id="series-fields" class="hidden">
+                <div class="form-row-3">
+                  <div class="form-field">
+                    <label>Saisons</label>
+                    <input type="number" id="f-seasons" min="1" />
+                  </div>
+                  <div class="form-field">
+                    <label>Épisodes</label>
+                    <input type="number" id="f-episodes" min="1" />
+                  </div>
+                  <div class="form-field">
+                    <label>Durée ép. (min)</label>
+                    <input type="number" id="f-duration" min="1" />
+                  </div>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn-ghost" id="form-cancel">Annuler</button>
+                <button type="submit" class="btn-primary" id="form-submit">Ajouter</button>
+              </div>
+            </div>
+          </form>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="script.js"></script>
 </body>
