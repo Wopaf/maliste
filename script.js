@@ -1274,14 +1274,6 @@ document.getElementById('menu-btn').addEventListener('click', openSideMenu);
 document.getElementById('side-menu-close').addEventListener('click', closeSideMenu);
 sideMenuBackdrop.addEventListener('click', closeSideMenu);
 
-document.getElementById('side-top-real-btn').addEventListener('click', () => {
-  closeSideMenu();
-  showTopPopup('real');
-});
-document.getElementById('side-top-cast-btn').addEventListener('click', () => {
-  closeSideMenu();
-  showTopPopup('cast');
-});
 
 // ============================================================
 //  ADMIN PANEL
