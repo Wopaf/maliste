@@ -809,7 +809,24 @@ function render() {
     a.href = item.url;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
+
+    let longPressTimer = null;
+    let longPressFired = false;
+    a.addEventListener('pointerdown', () => {
+      longPressFired = false;
+      longPressTimer = setTimeout(() => {
+        if (item.poster) {
+          longPressFired = true;
+          openPosterZoom(item.poster);
+        }
+      }, 450);
+    });
+    a.addEventListener('pointerup', () => clearTimeout(longPressTimer));
+    a.addEventListener('pointercancel', () => clearTimeout(longPressTimer));
+    a.addEventListener('pointermove', () => clearTimeout(longPressTimer));
+
     a.addEventListener('click', e => {
+      if (longPressFired) { e.preventDefault(); longPressFired = false; return; }
       if (!e.ctrlKey && !e.metaKey && e.button !== 1) {
         e.preventDefault();
         openModal(item, a);
@@ -1078,6 +1095,54 @@ function closeModal() {
     activeWrapper = null;
   }
 }
+
+const posterZoomModal = document.getElementById('poster-zoom-modal');
+const posterZoomImg   = document.getElementById('poster-zoom-img');
+const posterZoomWrap  = document.getElementById('poster-zoom-wrap');
+const posterZoomShine = document.getElementById('poster-zoom-shine');
+
+function openPosterZoom(src) {
+  posterZoomImg.src = src;
+  posterZoomWrap.style.transition = 'transform 0.28s cubic-bezier(0.34,1.2,0.64,1), opacity 0.22s';
+  posterZoomModal.classList.add('open');
+}
+function closePosterZoom() {
+  posterZoomModal.classList.remove('open');
+  posterZoomWrap.style.transform = '';
+  posterZoomShine.style.opacity = '0';
+}
+posterZoomModal.addEventListener('click', closePosterZoom);
+
+let posterGrabbed = false;
+posterZoomWrap.addEventListener('pointerdown', e => {
+  posterGrabbed = true;
+  posterZoomWrap.style.cursor = 'grabbing';
+  posterZoomWrap.setPointerCapture(e.pointerId);
+});
+posterZoomWrap.addEventListener('pointerup', () => {
+  if (!posterGrabbed) return;
+  posterGrabbed = false;
+  posterZoomWrap.style.cursor = 'grab';
+  posterZoomWrap.style.transition = 'transform 0.45s cubic-bezier(0.23,1,0.32,1)';
+  posterZoomWrap.style.transform = 'perspective(700px) rotateX(0deg) rotateY(0deg) scale(1)';
+  posterZoomShine.style.opacity = '0';
+});
+posterZoomWrap.addEventListener('pointermove', e => {
+  if (!posterGrabbed) return;
+  const rect = posterZoomWrap.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const dx = (e.clientX - cx) / (rect.width / 2);
+  const dy = (e.clientY - cy) / (rect.height / 2);
+  posterZoomWrap.style.transition = 'none';
+  posterZoomWrap.style.transform = `perspective(700px) rotateX(${-dy * 14}deg) rotateY(${dx * 18}deg) scale(1)`;
+  const px = ((e.clientX - rect.left) / rect.width) * 100;
+  const py = ((e.clientY - rect.top) / rect.height) * 100;
+  posterZoomShine.style.background = `radial-gradient(circle at ${px}% ${py}%, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.08) 45%, transparent 70%)`;
+  posterZoomShine.style.opacity = '1';
+});
+posterZoomWrap.addEventListener('click', e => e.stopPropagation());
+posterZoomImg.addEventListener('dragstart', e => e.preventDefault());
 
 async function copyItemToMyList(item, btn) {
   if (!currentUser) return;
