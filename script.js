@@ -257,6 +257,8 @@ function avatarColor(uid) {
 function openProfilesModal() {
   userMenu.classList.remove('open');
   profilesModal.classList.add('open');
+  const searchInput = document.getElementById('profiles-search');
+  searchInput.value = '';
   const list = document.getElementById('profiles-grid');
   list.innerHTML = '<p style="color:#555;padding:20px 16px">Chargement…</p>';
 
@@ -277,9 +279,10 @@ function openProfilesModal() {
       const isSelf    = uid === currentUser?.uid;
       const isViewing = uid === currentViewUid;
 
+      const accentBorder = p.accentColor ? `box-shadow:0 0 0 3px ${p.accentColor};` : '';
       const avatarHtml = p.avatar
-        ? `<img class="profile-avatar" src="${p.avatar}" style="object-fit:cover" alt="${name}" />`
-        : `<div class="profile-avatar" style="background:${avatarColor(uid)}">${initial}</div>`;
+        ? `<img class="profile-avatar" src="${p.avatar}" style="object-fit:cover;${accentBorder}" alt="${name}" />`
+        : `<div class="profile-avatar" style="background:${avatarColor(uid)};${accentBorder}">${initial}</div>`;
 
       const row = document.createElement('div');
       row.className = 'profile-row' + (isSelf ? ' profile-row-self' : '');
@@ -288,16 +291,8 @@ function openProfilesModal() {
         row.innerHTML = `
           ${avatarHtml}
           <div class="profile-info">
-            <div class="profile-name-row">
-              <span class="profile-name" id="prof-name-display">${name}</span>
-              <input class="profile-field-input hidden" id="prof-name-input" value="${name}" maxlength="30" />
-              <button class="profile-edit-btn" id="prof-name-edit-btn" title="Modifier le pseudo">✎</button>
-            </div>
-            <div class="profile-desc-row">
-              <span class="profile-desc" id="prof-desc-display" data-empty="${desc ? 'false' : 'true'}">${desc || 'Ajouter une description…'}</span>
-              <input class="profile-field-input hidden" id="prof-desc-input" value="${desc}" maxlength="100" placeholder="Description…" />
-              <button class="profile-edit-btn" id="prof-desc-edit-btn" title="Modifier la description">✎</button>
-            </div>
+            <span class="profile-name">${name}</span>
+            ${desc ? `<span class="profile-desc">${desc}</span>` : ''}
           </div>
           <span class="profile-self-label">Moi</span>
         `;
@@ -317,87 +312,20 @@ function openProfilesModal() {
       list.appendChild(row);
     });
 
-    // Name editing
-    const nameDisplay = document.getElementById('prof-name-display');
-    const nameInput   = document.getElementById('prof-name-input');
-    const nameEditBtn = document.getElementById('prof-name-edit-btn');
-    if (nameEditBtn) {
-      const saveNameEdit = () => {
-        const val = nameInput.value.trim() || nameDisplay.textContent;
-        nameDisplay.textContent = val;
-        nameInput.classList.add('hidden');
-        nameDisplay.classList.remove('hidden');
-        nameEditBtn.textContent = '✎';
-        if (currentUser) {
-          db.ref(`users/${currentUser.uid}/name`).set(val);
-          db.ref(`profiles/${currentUser.uid}/name`).set(val);
-        }
-      };
-      nameEditBtn.addEventListener('click', () => {
-        const editing = !nameInput.classList.contains('hidden');
-        if (editing) {
-          saveNameEdit();
-        } else {
-          nameInput.classList.remove('hidden');
-          nameDisplay.classList.add('hidden');
-          nameInput.focus();
-          nameEditBtn.textContent = '✓';
-        }
-      });
-      nameInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') saveNameEdit();
-        if (e.key === 'Escape') {
-          nameInput.classList.add('hidden');
-          nameDisplay.classList.remove('hidden');
-          nameEditBtn.textContent = '✎';
-        }
-      });
-    }
-
-    // Description editing
-    const descDisplay = document.getElementById('prof-desc-display');
-    const descInput   = document.getElementById('prof-desc-input');
-    const descEditBtn = document.getElementById('prof-desc-edit-btn');
-    if (descEditBtn) {
-      const saveDescEdit = () => {
-        const val = descInput.value.trim();
-        descDisplay.textContent = val || 'Ajouter une description…';
-        descDisplay.dataset.empty = val ? 'false' : 'true';
-        descInput.classList.add('hidden');
-        descDisplay.classList.remove('hidden');
-        descEditBtn.textContent = '✎';
-        if (currentUser) {
-          db.ref(`users/${currentUser.uid}/description`).set(val || null);
-          db.ref(`profiles/${currentUser.uid}/description`).set(val || null);
-        }
-      };
-      descEditBtn.addEventListener('click', () => {
-        const editing = !descInput.classList.contains('hidden');
-        if (editing) {
-          saveDescEdit();
-        } else {
-          descInput.classList.remove('hidden');
-          descDisplay.classList.add('hidden');
-          descInput.focus();
-          descEditBtn.textContent = '✓';
-        }
-      });
-      descInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') saveDescEdit();
-        if (e.key === 'Escape') {
-          descInput.classList.add('hidden');
-          descDisplay.classList.remove('hidden');
-          descEditBtn.textContent = '✎';
-        }
-      });
-    }
-
     list.querySelectorAll('.profile-view-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         switchToUser(btn.dataset.uid);
         closeProfilesModal();
       });
     });
+
+    searchInput.oninput = () => {
+      const q = searchInput.value.trim().toLowerCase();
+      list.querySelectorAll('.profile-row').forEach(row => {
+        const name = row.querySelector('.profile-name')?.textContent.toLowerCase() || '';
+        row.style.display = (!q || name.includes(q)) ? '' : 'none';
+      });
+    };
   }).catch(() => {
     list.innerHTML = '<p style="color:#e05555;padding:20px 16px">Accès refusé — vérifie les règles Firebase.</p>';
   });
@@ -405,12 +333,146 @@ function openProfilesModal() {
 
 function closeProfilesModal() {
   profilesModal.classList.remove('open');
+  document.getElementById('profiles-search').value = '';
 }
 
 document.getElementById('profiles-open-btn').addEventListener('click', openProfilesModal);
 document.getElementById('profiles-modal-close').addEventListener('click', closeProfilesModal);
 profilesModal.addEventListener('click', e => { if (e.target === profilesModal) closeProfilesModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && profilesModal.classList.contains('open')) closeProfilesModal(); });
+
+// ── Modal édition profil ──────────────────────────────────────
+const editProfileModal = document.getElementById('edit-profile-modal');
+const ACCENT_COLORS = [
+  '#097ee5', '#e05555', '#e07a35', '#c9b830',
+  '#4caf6a', '#7c5ce5', '#e0559a', '#17b8b0'
+];
+let epSelectedColor  = null;
+let epSelectedAvatar = null;
+
+function applyAccentColor(color) {
+  document.documentElement.style.setProperty('--accent', color);
+}
+
+function openEditProfileModal() {
+  userMenu.classList.remove('open');
+  if (!currentUser) return;
+  db.ref(`profiles/${currentUser.uid}`).once('value').then(snap => {
+    const p = snap.val() || {};
+    document.getElementById('ep-name-input').value = p.name || '';
+    document.getElementById('ep-desc-input').value = p.description || '';
+
+    epSelectedAvatar = p.avatar || null;
+    epSelectedColor  = p.accentColor || ACCENT_COLORS[0];
+
+    const preview = document.getElementById('ep-avatar-preview');
+    if (p.avatar) {
+      preview.innerHTML = `<img src="${p.avatar}" alt="avatar" />`;
+    } else {
+      const initial = (p.name || '?')[0].toUpperCase();
+      preview.innerHTML = `<div class="ep-avatar-initial" style="background:${avatarColor(currentUser.uid)}">${initial}</div>`;
+    }
+    preview.style.borderColor = epSelectedColor;
+
+    renderEpColorSwatches(epSelectedColor);
+    renderEpAvatarPicker(p.avatar);
+    document.getElementById('ep-avatar-picker').classList.add('hidden');
+    editProfileModal.classList.add('open');
+  });
+}
+
+function renderEpColorSwatches(selectedColor) {
+  const container = document.getElementById('ep-color-swatches');
+  container.innerHTML = '';
+  ACCENT_COLORS.forEach(color => {
+    const btn = document.createElement('button');
+    btn.className = 'ep-color-swatch' + (color === selectedColor ? ' selected' : '');
+    btn.style.background = color;
+    btn.title = color;
+    btn.addEventListener('click', () => {
+      epSelectedColor = color;
+      container.querySelectorAll('.ep-color-swatch').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      document.getElementById('ep-avatar-preview').style.borderColor = color;
+    });
+    container.appendChild(btn);
+  });
+}
+
+function renderEpAvatarPicker(currentAvatarUrl) {
+  const picker = document.getElementById('ep-avatar-picker');
+  const posters = [...new Set(
+    [...films, ...series, ...anime].filter(i => i.poster).map(i => i.poster)
+  )];
+  if (!posters.length) {
+    picker.innerHTML = '<p style="color:#555;font-size:12px;padding:4px 0">Aucune affiche disponible.</p>';
+    return;
+  }
+  picker.innerHTML = '';
+  posters.forEach(url => {
+    const img = document.createElement('img');
+    img.src       = url;
+    img.className = 'ep-avatar-item' + (url === currentAvatarUrl ? ' selected' : '');
+    img.addEventListener('click', () => {
+      epSelectedAvatar = url;
+      const preview = document.getElementById('ep-avatar-preview');
+      preview.innerHTML = `<img src="${url}" alt="avatar" />`;
+      picker.querySelectorAll('.ep-avatar-item').forEach(i => i.classList.remove('selected'));
+      img.classList.add('selected');
+    });
+    picker.appendChild(img);
+  });
+}
+
+async function saveEditProfile() {
+  if (!currentUser) return;
+  const saveBtn = document.getElementById('ep-save-btn');
+  saveBtn.disabled = true;
+
+  const name = document.getElementById('ep-name-input').value.trim();
+  const desc = document.getElementById('ep-desc-input').value.trim();
+  const updates = {};
+
+  if (name) {
+    updates[`users/${currentUser.uid}/name`]    = name;
+    updates[`profiles/${currentUser.uid}/name`] = name;
+    document.getElementById('user-pseudo-display').textContent = name;
+    document.getElementById('user-initials').textContent       = name[0].toUpperCase();
+    document.getElementById('user-menu-avatar-initial').textContent = name[0].toUpperCase();
+    try { await currentUser.updateProfile({ displayName: name }); } catch(_) {}
+  }
+  updates[`users/${currentUser.uid}/description`]    = desc || null;
+  updates[`profiles/${currentUser.uid}/description`] = desc || null;
+
+  if (epSelectedAvatar) {
+    updates[`users/${currentUser.uid}/avatar`]    = epSelectedAvatar;
+    updates[`profiles/${currentUser.uid}/avatar`] = epSelectedAvatar;
+    setAvatarDisplay(epSelectedAvatar);
+  }
+  if (epSelectedColor) {
+    updates[`users/${currentUser.uid}/accentColor`]    = epSelectedColor;
+    updates[`profiles/${currentUser.uid}/accentColor`] = epSelectedColor;
+    applyAccentColor(epSelectedColor);
+  }
+
+  await db.ref().update(updates);
+  saveBtn.disabled = false;
+  closeEditProfileModal();
+}
+
+function closeEditProfileModal() {
+  editProfileModal.classList.remove('open');
+}
+
+document.getElementById('edit-profile-btn').addEventListener('click', openEditProfileModal);
+document.getElementById('edit-profile-close').addEventListener('click', closeEditProfileModal);
+document.getElementById('ep-cancel-btn').addEventListener('click', closeEditProfileModal);
+document.getElementById('ep-save-btn').addEventListener('click', saveEditProfile);
+const _toggleEpPicker = () => document.getElementById('ep-avatar-picker').classList.toggle('hidden');
+document.getElementById('ep-change-avatar-btn').addEventListener('click', _toggleEpPicker);
+document.getElementById('ep-avatar-preview').addEventListener('click', _toggleEpPicker);
+editProfileModal.addEventListener('click', e => { if (e.target === editProfileModal) closeEditProfileModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && editProfileModal.classList.contains('open')) closeEditProfileModal(); });
 
 function switchToUser(uid) {
   currentViewUid   = uid;
@@ -467,6 +529,7 @@ auth.onAuthStateChanged(user => {
       document.getElementById('user-menu-avatar-initial').textContent = pseudo[0].toUpperCase();
       document.getElementById('user-initials').textContent            = pseudo[0].toUpperCase();
       if (d.avatar) setAvatarDisplay(d.avatar);
+      if (d.accentColor) applyAccentColor(d.accentColor);
     });
     loadUserData(user.uid);
     updateViewingBanner();
@@ -507,18 +570,20 @@ const tabs = document.querySelectorAll(".tab");
 
 const sortDropdown = document.getElementById("sort-dropdown");
 const genreDropdown = document.getElementById("genre-dropdown");
-const layoutToggle = document.getElementById("layout-toggle");
+const compactFbarBtn = document.getElementById("compact-fbar-btn");
+const compactSideBtn = document.getElementById("compact-side-btn");
 
-if (localStorage.getItem("compactLayout") === "1") {
-  grid.classList.add("compact");
-  layoutToggle.classList.add("active");
+function setCompactLayout(compact) {
+  grid.classList.toggle("compact", compact);
+  compactFbarBtn.classList.toggle("active", compact);
+  compactSideBtn.classList.toggle("active", compact);
+  localStorage.setItem("compactLayout", compact ? "1" : "0");
 }
 
-layoutToggle.addEventListener("click", () => {
-  grid.classList.toggle("compact");
-  layoutToggle.classList.toggle("active");
-  localStorage.setItem("compactLayout", grid.classList.contains("compact") ? "1" : "0");
-});
+if (localStorage.getItem("compactLayout") === "1") setCompactLayout(true);
+
+compactFbarBtn.addEventListener("click", () => setCompactLayout(!grid.classList.contains("compact")));
+compactSideBtn.addEventListener("click", () => { setCompactLayout(!grid.classList.contains("compact")); closeSideMenu(); });
 
 const fBarToggle = document.getElementById("f-bar-toggle");
 const fBarControls = document.getElementById("f-bar-controls");
@@ -950,6 +1015,15 @@ function openModal(item, triggerEl) {
   document.getElementById('modal-trailer').href =
     `https://www.google.com/search?q=${encodeURIComponent(item.title + ' bande annonce youtube')}`;
 
+  const copyBtn = document.getElementById('modal-copy-btn');
+  const isGuest = currentUser && currentViewUid !== currentUser.uid;
+  copyBtn.classList.toggle('hidden', !isGuest);
+  if (isGuest) {
+    copyBtn.textContent = 'Copier dans ma liste';
+    copyBtn.classList.remove('copied');
+    copyBtn.onclick = () => copyItemToMyList(item, copyBtn);
+  }
+
   const rect = triggerEl.getBoundingClientRect();
   const gap  = 10;
   const mw   = 360;
@@ -960,26 +1034,35 @@ function openModal(item, triggerEl) {
   modalEl.style.height = 'auto';
   modalEl.style.minHeight = `${mh}px`;
 
-  let left, top;
-
-  if (rect.right + gap + mw <= vw - 8) {
-    left = rect.right + gap;
-    modalEl.style.transformOrigin = 'left center';
+  if (vw <= 700) {
+    modalEl.style.left      = '50%';
+    modalEl.style.top       = '50%';
+    modalEl.style.transform = 'translate(-50%, -50%)';
+    modalEl.style.transformOrigin = 'center center';
+    modalEl.style.width     = `${Math.min(mw, vw - 24)}px`;
   } else {
-    left = Math.max(8, rect.left - mw - gap);
-    modalEl.style.transformOrigin = 'right center';
+    modalEl.style.transform = '';
+    modalEl.style.width     = `${mw}px`;
+
+    let left, top;
+    if (rect.right + gap + mw <= vw - 8) {
+      left = rect.right + gap;
+      modalEl.style.transformOrigin = 'left center';
+    } else {
+      left = Math.max(8, rect.left - mw - gap);
+      modalEl.style.transformOrigin = 'right center';
+    }
+    top = rect.top;
+    if (top + mh > vh - 8) top = Math.max(8, vh - mh - 8);
+    modalEl.style.left = `${left}px`;
+    modalEl.style.top  = `${top}px`;
   }
-
-  top = rect.top;
-  if (top + mh > vh - 8) top = Math.max(8, vh - mh - 8);
-
-  modalEl.style.left = `${left}px`;
-  modalEl.style.top  = `${top}px`;
 
   // Élever la card cliquée au-dessus du backdrop
   activeWrapper = triggerEl.closest('.card-wrapper');
   activeWrapper.style.position = 'relative';
   activeWrapper.style.zIndex   = '595';
+  triggerEl.classList.add('card--active');
 
   modalBackdrop.classList.add('open');
   modalEl.classList.add('open');
@@ -989,10 +1072,33 @@ function closeModal() {
   modalBackdrop.classList.remove('open');
   modalEl.classList.remove('open');
   if (activeWrapper) {
+    activeWrapper.querySelector('.card')?.classList.remove('card--active');
     activeWrapper.style.position = '';
     activeWrapper.style.zIndex   = '';
     activeWrapper = null;
   }
+}
+
+async function copyItemToMyList(item, btn) {
+  if (!currentUser) return;
+  let arrName = 'films';
+  if (series.find(i => i.title === item.title)) arrName = 'series';
+  else if (anime.find(i => i.title === item.title)) arrName = 'anime';
+
+  const snap = await db.ref(`users/${currentUser.uid}/${arrName}`).once('value');
+  const existing = Object.values(snap.val() || {});
+  if (existing.find(i => i.title === item.title)) {
+    btn.textContent = 'Déjà dans ta liste';
+    btn.classList.add('copied');
+    return;
+  }
+  const copy = { ...item };
+  delete copy.stars;
+  existing.push(copy);
+  await db.ref(`users/${currentUser.uid}/${arrName}`).set(existing);
+  btn.textContent = '✓ Copié !';
+  btn.classList.add('copied');
+  btn.onclick = null;
 }
 
 modalClose.addEventListener('click', closeModal);
@@ -1065,6 +1171,116 @@ document.addEventListener('click', e => {
     topPopup.classList.remove('open');
     topPopupOpen = null;
   }
+});
+
+// ============================================================
+//  SIDE MENU MOBILE
+// ============================================================
+
+const sideMenuEl       = document.getElementById('side-menu');
+const sideMenuBackdrop = document.getElementById('side-menu-backdrop');
+
+const SORT_LABELS = {
+  'alpha-asc':  'A → Z',
+  'alpha-desc': 'Z → A',
+  'year-desc':  'Récent',
+  'year-asc':   'Ancien',
+  'stars-desc': 'Mieux notés',
+  'stars-asc':  'Moins notés',
+};
+
+function openSideMenu() {
+  sideMenuEl.classList.add('open');
+  sideMenuBackdrop.classList.add('open');
+  renderSideMenu();
+}
+
+function closeSideMenu() {
+  sideMenuEl.classList.remove('open');
+  sideMenuBackdrop.classList.remove('open');
+}
+
+function renderSideMenu() {
+  renderSideTabs();
+  renderSideSort();
+  renderSideGenre();
+  renderSideStats();
+}
+
+function renderSideTabs() {
+  const TAB_DEFS = [
+    { key: 'films',  label: 'Films' },
+    { key: 'series', label: 'Séries' },
+    { key: 'anime',  label: 'Animés' },
+  ];
+  const container = document.getElementById('side-tabs');
+  container.innerHTML = '';
+  TAB_DEFS.forEach(({ key, label }) => {
+    const btn = document.createElement('button');
+    btn.className = 'side-tab-btn' + (currentTab === key ? ' active' : '');
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      document.querySelector(`.tab[data-tab="${key}"]`)?.click();
+      closeSideMenu();
+    });
+    container.appendChild(btn);
+  });
+}
+
+function renderSideSort() {
+  const container = document.getElementById('side-sort-list');
+  container.innerHTML = '';
+  Object.entries(SORT_LABELS).forEach(([value, label]) => {
+    const item = document.createElement('div');
+    item.className = 'side-sort-item' + (currentSort === value ? ' active' : '');
+    item.innerHTML = `<span>${label}</span>${currentSort === value ? '<span class="side-sort-check">✓</span>' : ''}`;
+    item.addEventListener('click', () => {
+      document.querySelector(`#sort-dropdown .dropdown-item[data-value="${value}"]`)?.click();
+      closeSideMenu();
+    });
+    container.appendChild(item);
+  });
+}
+
+function renderSideGenre() {
+  const container = document.getElementById('side-genre-list');
+  container.innerHTML = '';
+  document.querySelectorAll('#genre-dropdown .dropdown-item').forEach(li => {
+    const genre = li.querySelector('span')?.textContent?.trim() || '';
+    if (!genre) return;
+    const chip = document.createElement('div');
+    chip.className = 'side-genre-chip' + (currentGenre === genre ? ' active' : '');
+    chip.textContent = genre;
+    chip.addEventListener('click', () => {
+      li.click();
+      renderSideGenre();
+      renderSideStats();
+    });
+    container.appendChild(chip);
+  });
+}
+
+function renderSideStats() {
+  const container = document.getElementById('side-menu-stats');
+  const countText = document.getElementById('result-count')?.textContent || '';
+  const timeText  = document.getElementById('time-count')?.textContent  || '';
+  container.innerHTML = `
+    ${countText ? `<div class="side-stat"><span>${countText}</span></div>` : ''}
+    ${timeText  ? `<div class="side-stat"><span class="side-stat-value">${timeText}</span></div>` : ''}
+  `;
+}
+
+document.getElementById('menu-btn').addEventListener('click', openSideMenu);
+document.getElementById('side-menu-close').addEventListener('click', closeSideMenu);
+sideMenuBackdrop.addEventListener('click', closeSideMenu);
+
+document.getElementById('side-top-real-btn').addEventListener('click', () => {
+  closeSideMenu();
+  showTopPopup('real');
+});
+document.getElementById('side-top-cast-btn').addEventListener('click', () => {
+  closeSideMenu();
+  showTopPopup('cast');
 });
 
 // ============================================================
@@ -1274,6 +1490,7 @@ function openAdminModal(idx = null) {
 
 function closeAdminModal() {
   document.getElementById('entry-modal').classList.add('hidden');
+  document.getElementById('entry-dup-error').classList.add('hidden');
 }
 
 document.getElementById('admin-add-btn').addEventListener('click',        () => openAdminModal(null));
@@ -1321,6 +1538,12 @@ document.getElementById('entry-form').addEventListener('submit', e => {
     if (existing.stars) entry.stars = existing.stars;
     adminData[adminTab][adminEditingIdx] = entry;
   } else {
+    const titleLow = entry.title.toLowerCase();
+    const isDup = adminData[adminTab].some(item => item.title.toLowerCase() === titleLow);
+    if (isDup) {
+      document.getElementById('entry-dup-error').classList.remove('hidden');
+      return;
+    }
     adminData[adminTab].push(entry);
   }
 
@@ -1330,6 +1553,7 @@ document.getElementById('entry-form').addEventListener('submit', e => {
 
 // ── Poster preview ────────────────────────────────────────────
 document.getElementById('f-poster').addEventListener('input', e => adminUpdatePosterPreview(e.target.value));
+document.getElementById('f-title').addEventListener('input', () => document.getElementById('entry-dup-error').classList.add('hidden'));
 
 function adminUpdatePosterPreview(url) {
   const img = document.getElementById('poster-preview');
