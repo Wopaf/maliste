@@ -29,9 +29,52 @@
     </div>
   </div>
 
+  <!-- ── Page d'accueil ── -->
+  <div id="home-page" class="home-page hidden">
+    <header class="home-header">
+      <img class="home-header-bg" id="home-header-bg" src="" alt="" style="display:none" />
+      <button class="home-user-btn" id="home-user-btn">
+        <img class="home-user-avatar" id="home-user-avatar" style="display:none" alt="" />
+        <span class="home-user-initials" id="home-user-initials"></span>
+      </button>
+      <p class="home-app-title" id="home-app-title"></p>
+    </header>
+    <div class="home-content">
+      <section class="home-carousel">
+        <div class="home-carousel-hdr">
+          <h2 class="home-carousel-title">Mes Films</h2>
+        </div>
+        <div class="home-strip" id="home-strip-films"></div>
+      </section>
+      <section class="home-carousel">
+        <div class="home-carousel-hdr">
+          <h2 class="home-carousel-title">Mes Séries</h2>
+        </div>
+        <div class="home-strip" id="home-strip-series"></div>
+      </section>
+      <section class="home-carousel" id="home-section-community">
+        <div class="home-carousel-hdr">
+          <h2 class="home-carousel-title">Communauté</h2>
+        </div>
+        <div class="home-strip home-strip-community" id="home-strip-community"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ── Application principale ── -->
+  <div id="main-app" class="hidden">
   <div class="sticky-top">
+  <div id="viewing-banner" class="viewing-banner">
+    <span>Liste de <strong class="viewing-banner-name"></strong></span>
+    <button id="back-my-list-btn" class="viewing-banner-back">← Ma liste</button>
+  </div>
   <header>
     <div class="controls">
+    <button class="back-home-btn" id="back-home-btn" aria-label="Accueil">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+        <polyline points="15,18 9,12 15,6"/>
+      </svg>
+    </button>
     <button class="menu-btn" id="menu-btn" aria-label="Menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/>
@@ -51,16 +94,12 @@
     <div class="f-bar">
       <nav class="tabs">
         <button class="tab active" data-tab="films">
-          <span class="tab-label">Films</span>
+          <span class="tab-label">Mes Films</span>
           <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="m160-800 65 130q7 14 20 22t28 8q30 0 46-25.5t2-52.5l-41-82h80l65 130q7 14 20 22t28 8q30 0 46-25.5t2-52.5l-41-82h80l65 130q7 14 20 22t28 8q30 0 46-25.5t2-52.5l-41-82h120q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Zm0 240v320h640v-320H160Zm0 0v320-320Z"/></svg></span>
         </button>
         <button class="tab" data-tab="series">
-          <span class="tab-label">Séries</span>
+          <span class="tab-label">Mes Séries</span>
           <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="M400-200v-80H160q-33 0-56.5-23.5T80-360v-400q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v400q0 33-23.5 56.5T800-280H560v80h40q17 0 28.5 11.5T640-160q0 17-11.5 28.5T600-120H360q-17 0-28.5-11.5T320-160q0-17 11.5-28.5T360-200h40ZM160-360h640v-400H160v400Zm0 0v-400 400Z"/></svg></span>
-        </button>
-        <button class="tab" data-tab="anime">
-          <span class="tab-label">Animés</span>
-          <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="M200-120q-17 0-28.5-11.5T160-160v-97q0-16 6-30.5t17-25.5l504-503q12-12 27-18t30-6q16 0 30.5 6t25.5 18l56 56q12 11 18 25.5t6 30.5q0 15-6 30t-18 27L353-143q-11 11-25.5 17t-30.5 6h-97Zm40-80h56l393-392-28-29-29-28-392 393v56Zm560-503-57-57 57 57Zm-139 82-29-28 57 57-28-29ZM560-120q74 0 137-37t63-103q0-32-16-55.5T702-359q-14-10-30-10t-27 12q-11 12-11 29.5t14 27.5q14 11 23 20t9 20q0 23-36.5 41.5T560-200q-17 0-28.5 11.5T520-160q0 17 11.5 28.5T560-120ZM360-720q0 14-17.5 25.5T262-654q-80 35-111 63.5T120-520q0 26 12 46t31 35q13 11 29 9.5t27-14.5q11-13 10-29t-14-27q-7-5-11-10t-4-10q0-12 18-24t76-37q88-38 117-69t29-70q0-55-44-87.5T280-840q-45 0-80.5 16T145-785q-11 13-9 29t15 26q13 11 29 9t27-13q14-14 31-20t42-6q41 0 60.5 12t19.5 28Z"/></svg></span>
         </button>
       </nav>
       <button class="f-bar-toggle" id="f-bar-toggle">
@@ -106,54 +145,19 @@
         <img class="user-btn-avatar" id="user-btn-avatar" style="display:none" alt="" />
         <span class="user-initials" id="user-initials"></span>
       </button>
-      <div class="user-menu" id="user-menu">
-        <div class="user-menu-header">
-          <div class="user-menu-profile-top">
-            <button class="user-menu-avatar-btn" id="user-menu-avatar-btn" title="Changer l'avatar">
-              <img class="user-menu-avatar-img" id="user-menu-avatar-img" style="display:none" alt="" />
-              <span class="user-menu-avatar-initial" id="user-menu-avatar-initial"></span>
-              <div class="user-menu-avatar-overlay">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              </div>
-            </button>
-            <div class="user-menu-profile-info">
-              <div class="user-pseudo-row" id="user-pseudo-row">
-                <span class="user-pseudo-text" id="user-pseudo-display"></span>
-                <button class="user-pseudo-edit-btn" id="user-pseudo-edit-btn" title="Modifier le pseudo">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                </button>
-              </div>
-              <div class="user-pseudo-editing" id="user-pseudo-editing" style="display:none">
-                <input type="text" id="user-pseudo-input" class="user-pseudo-input" maxlength="24" autocomplete="off" />
-                <button class="user-pseudo-save" id="user-pseudo-save">✓</button>
-              </div>
-              <span class="user-menu-email" id="user-menu-email"></span>
-            </div>
-          </div>
-          <div class="avatar-picker" id="avatar-picker" style="display:none">
-            <p class="avatar-picker-label">Choisir une affiche</p>
-            <div class="avatar-picker-grid" id="avatar-picker-grid"></div>
-          </div>
-        </div>
-        <a class="user-menu-edit" href="#" id="edit-lists-link">Éditer mes listes</a>
-        <button class="user-menu-item" id="edit-profile-btn">Editer mon Profil</button>
-        <button class="user-menu-item" id="profiles-open-btn">Communauté</button>
-        <div class="user-menu-separator"></div>
-        <button class="user-menu-logout" id="logout-btn">Se déconnecter</button>
-      </div>
     </div>
     </div>
   </header>
-
   <div class="grid-info">
     <span id="result-count" class="badge"></span>
     <span id="time-count" class="badge"></span>
   </div>
-  <div id="viewing-banner" class="viewing-banner">
-    <span>Liste de <strong class="viewing-banner-name"></strong></span>
-    <button id="back-my-list-btn" class="viewing-banner-back">← Ma liste</button>
-  </div>
-  </div>
+  </div><!-- /.sticky-top -->
+
+  <section class="rec-section">
+    <h2 class="rec-section-title">Dernier coup de cœur</h2>
+    <div id="rec-card-wrap"></div>
+  </section>
 
   <main id="grid" class="grid"></main>
 
@@ -165,6 +169,29 @@
     <p class="top-popup-title" id="top-popup-title"></p>
     <ul class="top-popup-list" id="top-popup-list"></ul>
   </div>
+  </div><!-- /#main-app -->
+
+  <!-- Menu profil global (fixed, accessible depuis toutes les pages) -->
+  <div class="user-menu" id="user-menu">
+      <div class="user-menu-header">
+        <div class="user-menu-profile-top">
+          <div class="user-menu-avatar-btn" id="user-menu-avatar-btn">
+            <img class="user-menu-avatar-img" id="user-menu-avatar-img" style="display:none" alt="" />
+            <span class="user-menu-avatar-initial" id="user-menu-avatar-initial"></span>
+          </div>
+          <div class="user-menu-profile-info">
+            <div class="user-pseudo-row" id="user-pseudo-row">
+              <span class="user-pseudo-text" id="user-pseudo-display"></span>
+            </div>
+            <span class="user-menu-email" id="user-menu-email"></span>
+          </div>
+        </div>
+      </div>
+      <a class="user-menu-edit" href="#" id="edit-lists-link">Éditer mes listes</a>
+      <button class="user-menu-item" id="edit-profile-btn">Editer mon Profil</button>
+      <div class="user-menu-separator"></div>
+      <button class="user-menu-logout" id="logout-btn">Se déconnecter</button>
+    </div>
 
   <div id="modal-backdrop" class="modal-backdrop"></div>
   <div class="modal-card" id="modal-card">
@@ -174,12 +201,6 @@
         <p class="modal-title" id="modal-title"></p>
         <div class="modal-year-row">
           <p class="modal-year" id="modal-year"></p>
-          <div class="modal-stars" id="modal-stars">
-            <span class="star" data-value="1"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-            <span class="star" data-value="2"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-            <span class="star" data-value="3"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-            <span class="star star-caca" data-value="-1"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c-1.1 0-2 .9-2 2 0 .6.3 1.1.7 1.5C8.7 6.3 7.5 7.9 7.5 9.8c0 .4.1.8.2 1.2C5.9 11.8 5 13.3 5 15c0 2.8 2.2 5 5 5h8c2.8 0 5-2.2 5-5 0-1.7-.9-3.2-2.7-3.9.1-.4.2-.8.2-1.2 0-1.9-1.2-3.5-3.2-4.3.4-.4.7-.9.7-1.5 0-1.1-.9-2-2-2z"/></svg></span>
-          </div>
         </div>
         <hr class="modal-divider">
         <p class="modal-director" id="modal-director"></p>
@@ -189,6 +210,21 @@
       <div class="modal-actions">
         <a class="modal-link" id="modal-link" target="_blank" rel="noopener noreferrer">Informations</a>
         <a class="modal-link modal-link-secondary" id="modal-trailer" target="_blank" rel="noopener noreferrer">Bande annonce</a>
+      </div>
+      <div class="modal-stars" id="modal-stars">
+        <span class="star" data-value="1"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        <span class="star" data-value="2"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        <span class="star" data-value="3"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        <span class="star" data-value="4"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        <span class="star" data-value="5"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        <span class="star" data-value="6"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        <span class="star" data-value="7"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        <span class="star" data-value="8"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        <span class="star" data-value="9"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        <span class="star" data-value="10"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+      </div>
+      <div class="modal-bottom-actions">
+        <button class="modal-recommend-btn" id="modal-recommend-btn">❤ Mettre en recommandation</button>
         <button class="modal-copy-btn hidden" id="modal-copy-btn">Copier dans ma liste</button>
       </div>
     </div>
@@ -206,13 +242,19 @@
           <p class="side-section-title">Catégorie</p>
           <div id="side-tabs"></div>
         </div>
-        <div class="side-section">
-          <p class="side-section-title">Tri</p>
-          <div id="side-sort-list"></div>
+        <div class="side-section side-collapsible collapsed" id="side-sort-section">
+          <button class="side-collapsible-header">
+            <span class="side-section-title" style="margin-bottom:0">Tri</span>
+            <svg class="side-collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <div class="side-collapsible-body" id="side-sort-list"></div>
         </div>
-        <div class="side-section">
-          <p class="side-section-title">Genre</p>
-          <div id="side-genre-list"></div>
+        <div class="side-section side-collapsible collapsed" id="side-genre-section">
+          <button class="side-collapsible-header">
+            <span class="side-section-title" style="margin-bottom:0">Filtrer</span>
+            <svg class="side-collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <div class="side-collapsible-body" id="side-genre-list"></div>
         </div>
         <div class="side-section">
           <p class="side-section-title">Affichage</p>
@@ -225,6 +267,20 @@
             Vue compacte
           </button>
         </div>
+      </div>
+      <div class="side-menu-nav">
+        <button class="side-action-btn" id="side-nav-home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+            <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><polyline points="9,22 9,12 15,12 15,22"/>
+          </svg>
+          Page d'accueil
+        </button>
+        <button class="side-action-btn" id="side-nav-community">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+            <circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M1 21v-2a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v2"/><path d="M17 11a4 4 0 0 1 4 4v2"/>
+          </svg>
+          Communauté
+        </button>
       </div>
       <div class="side-menu-stats" id="side-menu-stats"></div>
     </div>
@@ -311,7 +367,6 @@
       <nav class="admin-tabs">
         <button class="a-tab active" data-tab="films">Films</button>
         <button class="a-tab" data-tab="series">Séries</button>
-        <button class="a-tab" data-tab="anime">Animés</button>
       </nav>
       <div class="filter-bar">
         <div class="search-bar" id="admin-search-bar">
@@ -402,22 +457,7 @@
                   </div>
                 </div>
               </div>
-              <div id="series-fields" class="hidden">
-                <div class="form-row-3">
-                  <div class="form-field">
-                    <label>Saisons</label>
-                    <input type="number" id="f-seasons" min="1" />
-                  </div>
-                  <div class="form-field">
-                    <label>Épisodes</label>
-                    <input type="number" id="f-episodes" min="1" />
-                  </div>
-                  <div class="form-field">
-                    <label>Durée ép. (min)</label>
-                    <input type="number" id="f-duration" min="1" />
-                  </div>
-                </div>
-              </div>
+              <div id="series-fields" class="hidden"></div>
               <p id="entry-dup-error" class="hidden" style="color:#e05555;font-size:12px;background:rgba(224,85,85,0.08);border:1px solid rgba(224,85,85,0.2);border-radius:8px;padding:8px 12px;">Ce titre est déjà présent dans la liste.</p>
               <div class="form-actions">
                 <button type="button" class="btn-ghost" id="form-cancel">Annuler</button>
