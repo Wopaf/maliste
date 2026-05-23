@@ -31,27 +31,41 @@
 
   <!-- ── Page d'accueil ── -->
   <div id="home-page" class="home-page hidden">
+    <div id="home-viewing-banner" class="viewing-banner" style="display:none">
+      <span>Profil de <strong class="viewing-banner-name" id="home-viewing-name"></strong></span>
+      <button id="home-back-btn" class="viewing-banner-back">← Mon profil</button>
+    </div>
     <header class="home-header">
-      <img class="home-header-bg" id="home-header-bg" src="" alt="" style="display:none" />
-      <button class="home-user-btn" id="home-user-btn">
-        <img class="home-user-avatar" id="home-user-avatar" style="display:none" alt="" />
-        <span class="home-user-initials" id="home-user-initials"></span>
-      </button>
-      <p class="home-app-title" id="home-app-title"></p>
+      <div class="home-cover">
+        <img class="home-header-bg" id="home-header-bg" src="" alt="" style="display:none" />
+        <div class="home-cover-gradient"></div>
+      </div>
+      <div class="home-profile-bar">
+        <button class="home-user-btn" id="home-user-btn">
+          <img class="home-user-avatar" id="home-user-avatar" style="display:none" alt="" />
+          <span class="home-user-initials" id="home-user-initials"></span>
+        </button>
+        <div class="home-profile-info">
+          <p class="home-app-title" id="home-app-title"></p>
+          <div class="home-profile-stats" id="home-profile-stats"></div>
+        </div>
+      </div>
     </header>
     <div class="home-content">
       <section class="home-carousel">
         <div class="home-carousel-hdr">
-          <h2 class="home-carousel-title">Mes Films</h2>
+          <h2 class="home-carousel-title" id="home-strip-films-title">Mes Films</h2>
         </div>
         <div class="home-strip" id="home-strip-films"></div>
       </section>
+      <hr class="home-divider">
       <section class="home-carousel">
         <div class="home-carousel-hdr">
-          <h2 class="home-carousel-title">Mes Séries</h2>
+          <h2 class="home-carousel-title" id="home-strip-series-title">Mes Séries</h2>
         </div>
         <div class="home-strip" id="home-strip-series"></div>
       </section>
+      <hr class="home-divider">
       <section class="home-carousel" id="home-section-community">
         <div class="home-carousel-hdr">
           <h2 class="home-carousel-title">Communauté</h2>
@@ -159,16 +173,21 @@
     <div id="rec-card-wrap"></div>
   </section>
 
+  <section class="top-section" id="top-section">
+    <button class="top-col" id="top-section-real-btn">
+      <h3 class="top-col-title"><span class="top-col-title-long">Top Réalisateurs</span><span class="top-col-title-short">Top Réal.</span></h3>
+      <svg class="top-col-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="9,18 15,12 9,6"/></svg>
+    </button>
+    <button class="top-col" id="top-section-cast-btn">
+      <h3 class="top-col-title">Top Acteurs</h3>
+      <svg class="top-col-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="9,18 15,12 9,6"/></svg>
+    </button>
+  </section>
+
+  <div id="person-badge-wrap" class="person-badge-wrap"></div>
+
   <main id="grid" class="grid"></main>
 
-  <div class="grid-info-right">
-    <button class="badge badge-btn" id="top-real-btn">Top Réal.</button>
-    <button class="badge badge-btn" id="top-cast-btn">Top Cast.</button>
-  </div>
-  <div class="top-popup" id="top-popup">
-    <p class="top-popup-title" id="top-popup-title"></p>
-    <ul class="top-popup-list" id="top-popup-list"></ul>
-  </div>
   </div><!-- /#main-app -->
 
   <!-- Menu profil global (fixed, accessible depuis toutes les pages) -->
@@ -196,6 +215,9 @@
   <div id="modal-backdrop" class="modal-backdrop"></div>
   <div class="modal-card" id="modal-card">
     <button class="modal-close" id="modal-close">✕</button>
+    <div class="modal-poster-header" id="modal-poster-header">
+      <img class="modal-poster-img" id="modal-poster-img" alt="">
+    </div>
     <div class="modal-info">
       <div class="modal-meta">
         <p class="modal-title" id="modal-title"></p>
@@ -223,11 +245,22 @@
         <span class="star" data-value="9"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
         <span class="star" data-value="10"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
       </div>
+      <p class="modal-rating-label" id="modal-rating-label"></p>
       <div class="modal-bottom-actions">
         <button class="modal-recommend-btn" id="modal-recommend-btn">❤ Mettre en recommandation</button>
         <button class="modal-copy-btn hidden" id="modal-copy-btn">Copier dans ma liste</button>
       </div>
     </div>
+  </div>
+
+  <div class="top-popup" id="top-popup">
+    <div class="top-popup-header">
+      <button class="top-popup-close" id="top-popup-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+<p class="top-popup-title" id="top-popup-title"></p>
+    </div>
+    <ul class="top-popup-list" id="top-popup-list"></ul>
   </div>
 
   <!-- ── Side menu mobile ── -->

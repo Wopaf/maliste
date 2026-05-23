@@ -389,7 +389,7 @@ function openProfilesModal() {
             ${desc ? `<span class="profile-desc">${desc}</span>` : ''}
           </div>
           <button class="profile-view-btn${isViewing ? ' viewing' : ''}" data-uid="${uid}">
-            ${isViewing ? 'En cours' : 'Voir sa liste'}
+            ${isViewing ? 'En cours' : 'Voir son profil'}
           </button>
         `;
       }
@@ -570,11 +570,20 @@ function switchToUser(uid) {
   loadUserData(uid);
   userMenu.classList.remove('open');
   updateViewingBanner();
+  if (currentUser && uid !== currentUser.uid) {
+    homePage.classList.remove('hidden');
+    mainApp.classList.add('hidden');
+    updateHomeHeaderForUid(uid);
+  }
 }
 
 document.getElementById('back-my-list-btn').addEventListener('click', () => {
   if (!currentUser) return;
   switchToUser(currentUser.uid);
+});
+
+document.getElementById('home-back-btn').addEventListener('click', () => {
+  showHomePage();
 });
 
 document.getElementById('edit-lists-link').addEventListener('click', e => {
@@ -601,12 +610,71 @@ function updateViewingBanner() {
 }
 
 // ── Navigation home ↔ app ────────────────────────────────────
+async function updateHomeHeaderForUid(uid) {
+  const snap = await db.ref(`profiles/${uid}`).once('value');
+  const p = snap.val() || {};
+  const name = p.name || 'Utilisateur';
+  document.getElementById('home-app-title').textContent = name;
+  const initials = document.getElementById('home-user-initials');
+  const avatar   = document.getElementById('home-user-avatar');
+  initials.textContent = name[0]?.toUpperCase() || '?';
+  if (p.avatar) {
+    avatar.src = p.avatar;
+    avatar.style.display = 'block';
+    initials.style.display = 'none';
+  } else {
+    avatar.style.display = 'none';
+    initials.style.display = '';
+  }
+  document.getElementById('home-viewing-name').textContent = name;
+  applyAccentColor(p.accentColor || ACCENT_COLORS[0]);
+  updateHomeViewingBanner();
+  const filmsTitle  = document.getElementById('home-strip-films-title');
+  const seriesTitle = document.getElementById('home-strip-series-title');
+  if (filmsTitle)  filmsTitle.textContent  = 'Ses Films';
+  if (seriesTitle) seriesTitle.textContent = 'Ses Séries';
+}
+
+function restoreOwnHomeHeader() {
+  if (!currentUser) return;
+  db.ref(`users/${currentUser.uid}`).once('value').then(snap => {
+    const d = snap.val() || {};
+    const name = d.name || currentUser.displayName || '?';
+    document.getElementById('home-app-title').textContent = name;
+    const initials = document.getElementById('home-user-initials');
+    const avatar   = document.getElementById('home-user-avatar');
+    initials.textContent = name[0]?.toUpperCase() || '?';
+    if (d.avatar) {
+      avatar.src = d.avatar;
+      avatar.style.display = 'block';
+      initials.style.display = 'none';
+    } else {
+      avatar.style.display = 'none';
+      initials.style.display = '';
+    }
+    applyAccentColor(d.accentColor || ACCENT_COLORS[0]);
+    const filmsTitle  = document.getElementById('home-strip-films-title');
+    const seriesTitle = document.getElementById('home-strip-series-title');
+    if (filmsTitle)  filmsTitle.textContent  = 'Mes Films';
+    if (seriesTitle) seriesTitle.textContent = 'Mes Séries';
+  });
+}
+
+function updateHomeViewingBanner() {
+  const banner = document.getElementById('home-viewing-banner');
+  if (!banner) return;
+  banner.style.display = (currentUser && currentViewUid !== currentUser.uid) ? 'flex' : 'none';
+}
+
 function showHomePage() {
-  if (currentUser && currentViewUid !== currentUser.uid) {
+  const wasGuest = currentUser && currentViewUid !== currentUser.uid;
+  if (wasGuest) {
     switchToUser(currentUser.uid);
+    restoreOwnHomeHeader();
   }
   homePage.classList.remove('hidden');
   mainApp.classList.add('hidden');
+  updateHomeViewingBanner();
   populateHomePage();
 }
 
@@ -620,9 +688,20 @@ function navigateToApp(tab) {
 }
 
 function populateHomePage() {
-  fillStrip('home-strip-films',  [...films].reverse(),                films.length);
-  fillStrip('home-strip-series', [...series, ...anime].reverse(),     series.length + anime.length);
+  fillStrip('home-strip-films',  [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)),                films.length);
+  fillStrip('home-strip-series', [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length);
   fillCommunityStrip();
+
+  const statsEl = document.getElementById('home-profile-stats');
+  if (statsEl) {
+    const fc = films.length;
+    const sc = series.length + anime.length;
+    statsEl.innerHTML = `
+      <span class="home-stat"><strong>${fc}</strong> film${fc !== 1 ? 's' : ''}</span>
+      <span class="home-stat-sep"></span>
+      <span class="home-stat"><strong>${sc}</strong> série${sc !== 1 ? 's' : ''}</span>
+    `;
+  }
 }
 
 function fillCommunityStrip() {
@@ -685,7 +764,6 @@ function fillCommunityStrip() {
 
       card.addEventListener('click', () => {
         switchToUser(uid);
-        navigateToApp('films');
       });
 
       strip.appendChild(card);
@@ -707,7 +785,10 @@ function fillStrip(stripId, items, total) {
   const row = document.createElement('div');
   row.className = 'home-carousel-row';
 
-  items.slice(0, 12).forEach(item => {
+  const MIN_SLOTS = 7;
+  const displayed = items.slice(0, 7);
+
+  displayed.forEach(item => {
     const card = document.createElement('div');
     card.className = 'home-carousel-card';
     if (item.poster) {
@@ -723,14 +804,14 @@ function fillStrip(stripId, items, total) {
     row.appendChild(card);
   });
 
+  for (let i = displayed.length; i < MIN_SLOTS; i++) {
+    const ghost = document.createElement('div');
+    ghost.className = 'home-carousel-card home-carousel-ghost';
+    row.appendChild(ghost);
+  }
+
   strip.appendChild(row);
 
-  if (total > 0) {
-    const badge = document.createElement('span');
-    badge.className = 'home-strip-count';
-    badge.textContent = total + ' ' + (total > 1 ? 'titres' : 'titre');
-    strip.appendChild(badge);
-  }
 }
 
 // ── État d'authentification ───────────────────────────────────
@@ -917,6 +998,8 @@ function sortData(data) {
   });
 }
 
+
+
 function render() {
   const query = searchInput.value.trim().toLowerCase();
   const raw = currentTab === "films" ? films : [...series, ...anime];
@@ -943,13 +1026,19 @@ function render() {
     countEl.textContent = `${data.length} ${label}${data.length > 1 ? "s" : ""}`;
   }
   if (timeEl) {
-    const totalMin = data.reduce((sum, item) => {
-      if (item.episodes && item.duration) return sum + item.episodes * item.duration;
-      return sum + parseTime(item.time);
-    }, 0);
-    const h = Math.round(totalMin / 60);
-    timeEl.textContent = `Estimation : ${h}h`;
+    if (currentTab !== 'films') {
+      timeEl.textContent = '';
+      timeEl.style.display = 'none';
+    } else {
+      const totalMin = data.reduce((sum, item) => sum + parseTime(item.time), 0);
+      const h = Math.round(totalMin / 60);
+      timeEl.textContent = `Estimation : ${h}h`;
+      timeEl.style.display = '';
+    }
   }
+
+  const topSection = document.getElementById('top-section');
+  if (topSection) topSection.style.display = query ? 'none' : '';
 
   grid.innerHTML = "";
 
@@ -1105,13 +1194,48 @@ searchClear.addEventListener('click', () => {
   searchInput.value = '';
   updateSearchClear();
   suggestionList.style.display = 'none';
+  updatePersonBadge('');
+  const recSection = document.querySelector('.rec-section');
+  if (recSection) recSection.style.display = '';
   render();
   searchInput.focus();
 });
 
+function updatePersonBadge(query) {
+  const wrap = document.getElementById('person-badge-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (!query || query.length < 2) return;
+
+  const q = query.toLowerCase();
+  const all = [...films, ...series, ...anime];
+  const seen = new Set();
+
+  for (const item of all) {
+    if (item.director && item.director.toLowerCase().includes(q)) seen.add(item.director);
+    for (const name of (item.cast || [])) {
+      if (name.toLowerCase().includes(q)) seen.add(name);
+    }
+  }
+
+  for (const name of [...seen].slice(0, 4)) {
+    const a = document.createElement('a');
+    a.className = 'person-badge';
+    a.href = `https://www.google.com/search?q=${encodeURIComponent(name + ' allociné')}`;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>${name}`;
+    wrap.appendChild(a);
+  }
+}
+
 searchInput.addEventListener("input", () => {
   updateSearchClear();
   showSuggestions(searchInput.value.trim());
+  const q = searchInput.value.trim();
+  const recSection = document.querySelector('.rec-section');
+  if (recSection) recSection.style.display = q ? 'none' : '';
+  updatePersonBadge(q);
   render();
 });
 
@@ -1127,19 +1251,21 @@ searchInput.addEventListener("focus", () => {
 const modalBackdrop = document.getElementById('modal-backdrop');
 const modalEl       = document.getElementById('modal-card');
 const modalClose    = document.getElementById('modal-close');
-let activeWrapper  = null;
-let activeTrigger  = null;
 
 function openModal(item, triggerEl) {
   document.getElementById('modal-title').textContent = item.title;
   document.getElementById('modal-year').textContent = item.year ?? '';
 
-  const starsEl = document.getElementById('modal-stars');
+  const RATING_LABELS = ['Pas de note','Catastrophique','Vraiment Mauvais','Bof','Oubliable','Moyen','Bon film','Mérite d\'être vu','Excellent','Chef-d\'œuvre','Immense Chef-d\'œuvre'];
+  const starsEl      = document.getElementById('modal-stars');
+  const ratingLabel  = document.getElementById('modal-rating-label');
+
   function refreshStars(rating) {
     starsEl.querySelectorAll('.star').forEach(s => {
       const v = parseInt(s.dataset.value);
       s.classList.toggle('active', rating > 0 && v <= rating);
     });
+    if (ratingLabel) ratingLabel.textContent = RATING_LABELS[rating] ?? '';
   }
   refreshStars(getStars(item.title));
   starsEl.querySelectorAll('.star').forEach(s => {
@@ -1148,6 +1274,7 @@ function openModal(item, triggerEl) {
       starsEl.querySelectorAll('.star').forEach(st => {
         st.classList.toggle('active', parseInt(st.dataset.value) <= v);
       });
+      if (ratingLabel) ratingLabel.textContent = RATING_LABELS[v] ?? '';
     });
     s.addEventListener('mouseleave', () => refreshStars(getStars(item.title)));
     s.onclick = () => {
@@ -1159,7 +1286,7 @@ function openModal(item, triggerEl) {
   });
 
   const personLink = name =>
-    `<a class="modal-person" href="https://www.google.com/search?q=${encodeURIComponent(name + ' allociné')}" target="_blank" rel="noopener noreferrer">${name}</a>`;
+    `<span class="modal-person" data-search="${name.replace(/"/g, '&quot;')}">${name}</span>`;
 
   const dirEl = document.getElementById('modal-director');
   const castEl = document.getElementById('modal-cast');
@@ -1184,9 +1311,23 @@ function openModal(item, triggerEl) {
       ? `Réalisateur: ${personLink(item.director)}`
       : '';
     castEl.innerHTML = item.cast && item.cast.length
-      ? `Casting: ${item.cast.map(personLink).join(', ')}`
+      ? `Casting: ${item.cast.map(personLink).join(' ')}`
       : '';
   }
+
+  document.querySelectorAll('.modal-person[data-search]').forEach(el => {
+    el.addEventListener('click', () => {
+      closeModal();
+      searchInput.value = el.dataset.search;
+      updateSearchClear();
+      const recSection = document.querySelector('.rec-section');
+      if (recSection) recSection.style.display = 'none';
+      const topSection = document.getElementById('top-section');
+      if (topSection) topSection.style.display = 'none';
+      updatePersonBadge(el.dataset.search);
+      render();
+    });
+  });
 
   document.getElementById('modal-link').href =
     `https://www.google.com/search?q=${encodeURIComponent(item.title + ' allociné')}`;
@@ -1204,49 +1345,15 @@ function openModal(item, triggerEl) {
     copyBtn.onclick = () => copyItemToMyList(item, copyBtn);
   }
 
-  const rect = triggerEl.getBoundingClientRect();
-  const gap  = 10;
-  const mw   = 360;
-  const cardW = Math.min(rect.width, 160);
-  const mh   = cardW * (3 / 2.5);
-  const vw   = window.innerWidth;
-  const vh   = window.innerHeight;
-
-  modalEl.style.height = 'auto';
-  modalEl.style.minHeight = `${mh}px`;
-
-  if (vw <= 700) {
-    modalEl.style.left      = '50%';
-    modalEl.style.top       = '50%';
-    modalEl.style.transform = 'translate(-50%, -50%)';
-    modalEl.style.transformOrigin = 'center center';
-    modalEl.style.width     = `${Math.min(mw, vw - 24)}px`;
+  const posterImg = document.getElementById('modal-poster-img');
+  const posterHeader = document.getElementById('modal-poster-header');
+  if (item.poster) {
+    posterImg.src = item.poster;
+    posterHeader.style.display = '';
   } else {
-    modalEl.style.transform = '';
-    modalEl.style.width     = `${mw}px`;
-
-    let left, top;
-    if (rect.right + gap + mw <= vw - 8) {
-      left = rect.right + gap;
-      modalEl.style.transformOrigin = 'left center';
-    } else {
-      left = Math.max(8, rect.left - mw - gap);
-      modalEl.style.transformOrigin = 'right center';
-    }
-    top = rect.top;
-    if (top + mh > vh - 8) top = Math.max(8, vh - mh - 8);
-    modalEl.style.left = `${left}px`;
-    modalEl.style.top  = `${top}px`;
+    posterImg.src = '';
+    posterHeader.style.display = 'none';
   }
-
-  // Élever la card cliquée au-dessus du backdrop
-  activeTrigger = triggerEl;
-  activeWrapper = triggerEl.closest('.card-wrapper') || null;
-  if (activeWrapper) {
-    activeWrapper.style.position = 'relative';
-    activeWrapper.style.zIndex   = '595';
-  }
-  triggerEl.classList.add('card--active');
 
   modalBackdrop.classList.add('open');
   modalEl.classList.add('open');
@@ -1255,16 +1362,6 @@ function openModal(item, triggerEl) {
 function closeModal() {
   modalBackdrop.classList.remove('open');
   modalEl.classList.remove('open');
-  if (activeTrigger) {
-    activeTrigger.classList.remove('card--active');
-    activeTrigger = null;
-  }
-  if (activeWrapper) {
-    activeWrapper.querySelector('.card')?.classList.remove('card--active');
-    activeWrapper.style.position = '';
-    activeWrapper.style.zIndex   = '';
-    activeWrapper = null;
-  }
 }
 
 const posterZoomModal = document.getElementById('poster-zoom-modal');
@@ -1339,7 +1436,9 @@ async function copyItemToMyList(item, btn) {
 
 modalClose.addEventListener('click', closeModal);
 modalBackdrop.addEventListener('click', e => {
-  if (e.target === modalBackdrop) closeModal();
+  if (e.target !== modalBackdrop) return;
+  if (topPopupOpen) closeTopPopup();
+  else closeModal();
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
@@ -1347,8 +1446,6 @@ document.addEventListener('keydown', e => {
 window.addEventListener('scroll', closeModal, { passive: true });
 
 // ── Top Réal. / Top Cast. ────────────────────────────────────
-const topRealBtn    = document.getElementById('top-real-btn');
-const topCastBtn    = document.getElementById('top-cast-btn');
 const topPopup      = document.getElementById('top-popup');
 const topPopupTitle = document.getElementById('top-popup-title');
 const topPopupList  = document.getElementById('top-popup-list');
@@ -1369,14 +1466,19 @@ function computeTop(key, limit = 10) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, limit);
 }
 
+function closeTopPopup() {
+  topPopup.classList.remove('open');
+  modalBackdrop.classList.remove('open');
+  topPopupOpen = null;
+}
+
 function showTopPopup(type) {
   if (topPopupOpen === type) {
-    topPopup.classList.remove('open');
-    topPopupOpen = null;
+    closeTopPopup();
     return;
   }
-  const top = computeTop(type === 'real' ? 'director' : 'cast', type === 'real' ? 10 : 30);
-  topPopupTitle.textContent = type === 'real' ? 'Top Réalisateurs' : 'Top Casting';
+  const top = computeTop(type === 'real' ? 'director' : 'cast', 50);
+  topPopupTitle.textContent = type === 'real' ? 'Top Réalisateurs' : 'Top Acteurs';
   topPopupList.innerHTML = top.map(([name, count], i) =>
     `<li class="top-popup-item">
       <span class="top-popup-rank">${i + 1}.</span>
@@ -1389,25 +1491,20 @@ function showTopPopup(type) {
     el.addEventListener('click', () => {
       searchInput.value = el.dataset.search;
       updateSearchClear();
-      topPopup.classList.remove('open');
-      topPopupOpen = null;
+      closeTopPopup();
       render();
     });
   });
   topPopup.classList.remove('open');
   void topPopup.offsetWidth;
   topPopup.classList.add('open');
+  modalBackdrop.classList.add('open');
   topPopupOpen = type;
 }
 
-topRealBtn.addEventListener('click', e => { e.stopPropagation(); showTopPopup('real'); });
-topCastBtn.addEventListener('click', e => { e.stopPropagation(); showTopPopup('cast'); });
-document.addEventListener('click', e => {
-  if (!topPopup.contains(e.target)) {
-    topPopup.classList.remove('open');
-    topPopupOpen = null;
-  }
-});
+document.getElementById('top-section-real-btn')?.addEventListener('click', e => { e.stopPropagation(); showTopPopup('real'); });
+document.getElementById('top-section-cast-btn')?.addEventListener('click', e => { e.stopPropagation(); showTopPopup('cast'); });
+document.getElementById('top-popup-close')?.addEventListener('click', e => { e.stopPropagation(); closeTopPopup(); });
 
 // ============================================================
 //  SIDE MENU MOBILE
