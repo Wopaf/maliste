@@ -15,7 +15,7 @@ setTimeout(() => {
   const loader = document.getElementById('page-loader');
   loader.classList.add('fade-out');
   loader.addEventListener('transitionend', () => loader.remove(), { once: true });
-}, 500);
+}, 150);
 
 firebase.initializeApp(FIREBASE_CONFIG);
 const db   = firebase.database();
@@ -33,7 +33,7 @@ const homePage = document.getElementById('home-page');
 const mainApp  = document.getElementById('main-app');
 
 function _tryRender() {
-  if (_dataReady && typeof render === 'function') render();
+  if (_dataReady && typeof render === 'function' && !mainApp.classList.contains('hidden')) render();
 }
 
 function sanitizeKey(title) {

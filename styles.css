@@ -10,6 +10,10 @@
   font-family: inherit;
 }
 
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
 ::-webkit-scrollbar { width: 0; height: 0; }
 * { scrollbar-width: none; }
 
@@ -3001,6 +3005,9 @@ header {
 
 
 @media (max-width: 700px) {
+  body {
+    background-attachment: scroll;
+  }
   .controls {
     width: 100%;
     padding: 8px !important;
