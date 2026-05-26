@@ -66,6 +66,13 @@
         <div class="home-strip" id="home-strip-series"></div>
       </section>
       <hr class="home-divider">
+      <section class="home-carousel" id="home-section-watchlist">
+        <div class="home-carousel-hdr">
+          <h2 class="home-carousel-title" id="home-strip-watchlist-title">À voir</h2>
+        </div>
+        <div class="home-strip" id="home-strip-watchlist"></div>
+      </section>
+      <hr class="home-divider">
       <section class="home-carousel" id="home-section-community">
         <div class="home-carousel-hdr">
           <h2 class="home-carousel-title">Communauté</h2>
@@ -108,12 +115,16 @@
     <div class="f-bar">
       <nav class="tabs">
         <button class="tab active" data-tab="films">
-          <span class="tab-label">Mes Films</span>
+          <span class="tab-label">Films</span>
           <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="m160-800 65 130q7 14 20 22t28 8q30 0 46-25.5t2-52.5l-41-82h80l65 130q7 14 20 22t28 8q30 0 46-25.5t2-52.5l-41-82h80l65 130q7 14 20 22t28 8q30 0 46-25.5t2-52.5l-41-82h120q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Zm0 240v320h640v-320H160Zm0 0v320-320Z"/></svg></span>
         </button>
         <button class="tab" data-tab="series">
-          <span class="tab-label">Mes Séries</span>
+          <span class="tab-label">Séries</span>
           <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="M400-200v-80H160q-33 0-56.5-23.5T80-360v-400q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v400q0 33-23.5 56.5T800-280H560v80h40q17 0 28.5 11.5T640-160q0 17-11.5 28.5T600-120H360q-17 0-28.5-11.5T320-160q0-17 11.5-28.5T360-200h40ZM160-360h640v-400H160v400Zm0 0v-400 400Z"/></svg></span>
+        </button>
+        <button class="tab" data-tab="watchlist">
+          <span class="tab-label">À voir</span>
+          <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm80-80h400v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Z"/></svg></span>
         </button>
       </nav>
       <button class="f-bar-toggle" id="f-bar-toggle">
@@ -249,6 +260,10 @@
       <div class="modal-bottom-actions">
         <button class="modal-recommend-btn" id="modal-recommend-btn">❤ Mettre en recommandation</button>
         <button class="modal-copy-btn hidden" id="modal-copy-btn">Copier dans ma liste</button>
+        <div class="modal-transfer-actions hidden" id="modal-transfer-actions">
+          <button class="modal-transfer-btn" id="modal-transfer-films">→ Transférer vers mes Films</button>
+          <button class="modal-transfer-btn" id="modal-transfer-series">→ Transférer vers mes Séries</button>
+        </div>
       </div>
     </div>
   </div>
@@ -400,6 +415,7 @@
       <nav class="admin-tabs">
         <button class="a-tab active" data-tab="films">Films</button>
         <button class="a-tab" data-tab="series">Séries</button>
+        <button class="a-tab" data-tab="watchlist">À voir</button>
       </nav>
       <div class="filter-bar">
         <div class="search-bar" id="admin-search-bar">

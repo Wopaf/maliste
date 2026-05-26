@@ -24,9 +24,10 @@ const auth = firebase.auth();
 let currentUser    = null;
 let currentViewUid = null;
 
-let films  = [];
-let series = [];
-let anime  = [];
+let films     = [];
+let series    = [];
+let anime     = [];
+let watchlist = [];
 let _dataReady = false;
 
 const homePage = document.getElementById('home-page');
@@ -41,7 +42,7 @@ function sanitizeKey(title) {
 }
 
 function getStars(title) {
-  const item = [...films, ...series, ...anime].find(i => i.title === title);
+  const item = [...films, ...series, ...anime, ...watchlist].find(i => i.title === title);
   return item?.stars || 0;
 }
 
@@ -81,13 +82,14 @@ function loadUserData(uid) {
   films = []; series = []; anime = [];
   db.ref(`users/${uid}`).once('value', snap => {
     const d = snap.val() || {};
-    films  = Object.values(d.films  || {});
-    series = Object.values(d.series || {});
-    anime  = Object.values(d.anime  || {});
+    films     = Object.values(d.films     || {});
+    series    = Object.values(d.series    || {});
+    anime     = Object.values(d.anime     || {});
+    watchlist = Object.values(d.watchlist || {});
     currentRecFilm   = d.recommendationFilm   || null;
     currentRecSeries = d.recommendationSeries || null;
     _dataReady = true;
-    buildGenreFilters(currentTab === 'films' ? films : [...series, ...anime]);
+    buildGenreFilters(currentTab === 'films' ? films : currentTab === 'watchlist' ? watchlist : [...series, ...anime]);
     renderRecommendation();
     if (!homePage.classList.contains('hidden')) populateHomePage();
     _tryRender();
@@ -117,6 +119,8 @@ function renderRecommendation() {
 
   const isOwn   = currentUser && currentViewUid === currentUser.uid;
   const isFilms = currentTab === 'films';
+  const isWatchlist = currentTab === 'watchlist';
+  if (isWatchlist) { if (section) section.style.display = 'none'; return; }
   const currentRec = isFilms ? currentRecFilm : currentRecSeries;
   const typeLabel  = isFilms ? 'film' : 'série';
 
@@ -184,8 +188,8 @@ function updateModalRecommendBtn(itemTitle) {
   const btn = document.getElementById('modal-recommend-btn');
   if (!btn) return;
   const isOwn = currentUser && currentViewUid === currentUser.uid;
-  btn.style.display = isOwn ? '' : 'none';
-  if (!isOwn) return;
+  btn.style.display = (isOwn && currentTab !== 'watchlist') ? '' : 'none';
+  if (!isOwn || currentTab === 'watchlist') return;
   const type   = films.some(f => f.title === itemTitle) ? 'film' : 'series';
   const curRec = type === 'film' ? currentRecFilm : currentRecSeries;
   const isRec  = curRec === itemTitle;
@@ -629,10 +633,12 @@ async function updateHomeHeaderForUid(uid) {
   document.getElementById('home-viewing-name').textContent = name;
   applyAccentColor(p.accentColor || ACCENT_COLORS[0]);
   updateHomeViewingBanner();
-  const filmsTitle  = document.getElementById('home-strip-films-title');
-  const seriesTitle = document.getElementById('home-strip-series-title');
+  const filmsTitle    = document.getElementById('home-strip-films-title');
+  const seriesTitle   = document.getElementById('home-strip-series-title');
+  const watchTitle    = document.getElementById('home-strip-watchlist-title');
   if (filmsTitle)  filmsTitle.textContent  = 'Ses Films';
   if (seriesTitle) seriesTitle.textContent = 'Ses Séries';
+  if (watchTitle)  watchTitle.textContent  = 'Sa liste À voir';
 }
 
 function restoreOwnHomeHeader() {
@@ -655,8 +661,10 @@ function restoreOwnHomeHeader() {
     applyAccentColor(d.accentColor || ACCENT_COLORS[0]);
     const filmsTitle  = document.getElementById('home-strip-films-title');
     const seriesTitle = document.getElementById('home-strip-series-title');
-    if (filmsTitle)  filmsTitle.textContent  = 'Mes Films';
-    if (seriesTitle) seriesTitle.textContent = 'Mes Séries';
+    const watchTitle  = document.getElementById('home-strip-watchlist-title');
+    if (filmsTitle)  filmsTitle.textContent  = 'Films';
+    if (seriesTitle) seriesTitle.textContent = 'Séries';
+    if (watchTitle)  watchTitle.textContent  = 'À voir';
   });
 }
 
@@ -688,18 +696,21 @@ function navigateToApp(tab) {
 }
 
 function populateHomePage() {
-  fillStrip('home-strip-films',  [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)),                films.length);
-  fillStrip('home-strip-series', [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length);
+  fillStrip('home-strip-films',     [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)), films.length);
+  fillStrip('home-strip-series',    [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length);
+  fillStrip('home-strip-watchlist', [...watchlist], watchlist.length);
   fillCommunityStrip();
 
   const statsEl = document.getElementById('home-profile-stats');
   if (statsEl) {
     const fc = films.length;
     const sc = series.length + anime.length;
+    const wc = watchlist.length;
     statsEl.innerHTML = `
       <span class="home-stat"><strong>${fc}</strong> film${fc !== 1 ? 's' : ''}</span>
       <span class="home-stat-sep"></span>
       <span class="home-stat"><strong>${sc}</strong> série${sc !== 1 ? 's' : ''}</span>
+      ${wc > 0 ? `<span class="home-stat-sep"></span><span class="home-stat"><strong>${wc}</strong> à voir</span>` : ''}
     `;
   }
 }
@@ -777,10 +788,6 @@ function fillStrip(stripId, items, total) {
   const strip = document.getElementById(stripId);
   if (!strip) return;
   strip.innerHTML = '';
-  if (!items?.length) {
-    strip.innerHTML = '<span class="home-strip-empty">Aucun élément</span>';
-    return;
-  }
 
   const row = document.createElement('div');
   row.className = 'home-carousel-row';
@@ -1002,7 +1009,7 @@ function sortData(data) {
 
 function render() {
   const query = searchInput.value.trim().toLowerCase();
-  const raw = currentTab === "films" ? films : [...series, ...anime];
+  const raw = currentTab === "films" ? films : currentTab === "watchlist" ? watchlist : [...series, ...anime];
 
   let data = sortData(raw);
 
@@ -1022,7 +1029,7 @@ function render() {
   const countEl = document.getElementById("result-count");
   const timeEl  = document.getElementById("time-count");
   if (countEl) {
-    const label = currentTab === "films" ? "film" : currentTab === "series" ? "série" : "animé";
+    const label = currentTab === "films" ? "film" : currentTab === "series" ? "série" : currentTab === "watchlist" ? "titre" : "animé";
     countEl.textContent = `${data.length} ${label}${data.length > 1 ? "s" : ""}`;
   }
   if (timeEl) {
@@ -1038,7 +1045,7 @@ function render() {
   }
 
   const topSection = document.getElementById('top-section');
-  if (topSection) topSection.style.display = query ? 'none' : '';
+  if (topSection) topSection.style.display = (query || currentTab === 'watchlist') ? 'none' : '';
 
   grid.innerHTML = "";
 
@@ -1117,7 +1124,7 @@ tabs.forEach(tab => {
     currentTab = tab.dataset.tab;
     currentGenre = "Tous";
     searchInput.value = "";
-    const data = currentTab === "films" ? films : [...series, ...anime];
+    const data = currentTab === "films" ? films : currentTab === "watchlist" ? watchlist : [...series, ...anime];
     buildGenreFilters(data);
     renderRecommendation();
     render();
@@ -1334,15 +1341,29 @@ function openModal(item, triggerEl) {
   document.getElementById('modal-trailer').href =
     `https://www.google.com/search?q=${encodeURIComponent(item.title + ' bande annonce youtube')}`;
 
+  const isWatchlistItem = currentTab === 'watchlist';
+  const isGuest = currentUser && currentViewUid !== currentUser.uid;
+
+  // Stars / rating: hide for watchlist (not yet seen)
+  starsEl.style.display = isWatchlistItem ? 'none' : '';
+  if (ratingLabel) ratingLabel.style.display = isWatchlistItem ? 'none' : '';
+
   updateModalRecommendBtn(item.title);
 
   const copyBtn = document.getElementById('modal-copy-btn');
-  const isGuest = currentUser && currentViewUid !== currentUser.uid;
-  copyBtn.classList.toggle('hidden', !isGuest);
-  if (isGuest) {
+  copyBtn.classList.toggle('hidden', !isGuest || isWatchlistItem);
+  if (isGuest && !isWatchlistItem) {
     copyBtn.textContent = 'Copier dans ma liste';
     copyBtn.classList.remove('copied');
     copyBtn.onclick = () => copyItemToMyList(item, copyBtn);
+  }
+
+  const transferActions = document.getElementById('modal-transfer-actions');
+  const isOwnWatchlist = !isGuest && isWatchlistItem;
+  transferActions.classList.toggle('hidden', !isOwnWatchlist);
+  if (isOwnWatchlist) {
+    document.getElementById('modal-transfer-films').onclick  = () => transferFromWatchlist(item, 'films');
+    document.getElementById('modal-transfer-series').onclick = () => transferFromWatchlist(item, 'series');
   }
 
   const posterImg = document.getElementById('modal-poster-img');
@@ -1432,6 +1453,33 @@ async function copyItemToMyList(item, btn) {
   btn.textContent = '✓ Copié !';
   btn.classList.add('copied');
   btn.onclick = null;
+}
+
+async function transferFromWatchlist(item, targetList) {
+  if (!currentUser) return;
+  const filmsBtn  = document.getElementById('modal-transfer-films');
+  const seriesBtn = document.getElementById('modal-transfer-series');
+  filmsBtn.disabled = true;
+  seriesBtn.disabled = true;
+
+  const targetSnap = await db.ref(`users/${currentUser.uid}/${targetList}`).once('value');
+  const targetItems = Object.values(targetSnap.val() || {});
+  if (!targetItems.find(i => i.title === item.title)) {
+    const copy = { ...item };
+    delete copy.stars;
+    targetItems.push(copy);
+    await db.ref(`users/${currentUser.uid}/${targetList}`).set(targetItems);
+  }
+
+  watchlist = watchlist.filter(i => i.title !== item.title);
+  const newWatchlist = watchlist;
+  await db.ref(`users/${currentUser.uid}/watchlist`).set(newWatchlist.length ? newWatchlist : null);
+
+  if (targetList === 'films') films = [...films, { ...item }];
+  else series = [...series, { ...item }];
+
+  closeModal();
+  render();
 }
 
 modalClose.addEventListener('click', closeModal);
@@ -1552,8 +1600,9 @@ function renderSideMenu() {
 
 function renderSideTabs() {
   const TAB_DEFS = [
-    { key: 'films',  label: 'Mes Films' },
-    { key: 'series', label: 'Mes Séries' },
+    { key: 'films',     label: 'Films' },
+    { key: 'series',    label: 'Séries' },
+    { key: 'watchlist', label: 'À voir' },
   ];
   const container = document.getElementById('side-tabs');
   container.innerHTML = '';
@@ -1613,8 +1662,9 @@ function renderSideStats() {
   `;
 }
 
-document.getElementById('home-strip-films') .addEventListener('click', () => navigateToApp('films'));
-document.getElementById('home-strip-series').addEventListener('click', () => navigateToApp('series'));
+document.getElementById('home-strip-films')    .addEventListener('click', () => navigateToApp('films'));
+document.getElementById('home-strip-series')   .addEventListener('click', () => navigateToApp('series'));
+document.getElementById('home-strip-watchlist').addEventListener('click', () => navigateToApp('watchlist'));
 
 document.getElementById('menu-btn').addEventListener('click', openSideMenu);
 document.getElementById('side-menu-close').addEventListener('click', closeSideMenu);
@@ -1636,7 +1686,7 @@ document.querySelector('#side-genre-section .side-collapsible-header').addEventL
 const TMDB_KEY = '528e49ad32fae0daa4734b34d9a758af';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
 
-let adminData       = { films: [], series: [], anime: [] };
+let adminData       = { films: [], series: [], anime: [], watchlist: [] };
 let adminTab        = 'films';
 let adminEditingIdx = null;
 
@@ -1662,9 +1712,10 @@ async function adminLoadData(uid) {
   const snap = await db.ref(`users/${uid}`).once('value');
   const d = snap.val() || {};
   adminData = {
-    films:  Object.values(d.films  || {}),
-    series: Object.values(d.series || {}),
-    anime:  Object.values(d.anime  || {}),
+    films:     Object.values(d.films     || {}),
+    series:    Object.values(d.series    || {}),
+    anime:     Object.values(d.anime     || {}),
+    watchlist: Object.values(d.watchlist || {}),
   };
   adminRenderList();
 }
@@ -1676,9 +1727,10 @@ async function adminSaveData() {
   btn.disabled = true;
   try {
     await db.ref(`users/${currentUser.uid}`).update({
-      films:  adminData.films,
-      series: adminData.series,
-      anime:  adminData.anime,
+      films:     adminData.films,
+      series:    adminData.series,
+      anime:     adminData.anime,
+      watchlist: adminData.watchlist,
     });
     label.textContent = '✓ Sauvegardé';
     setTimeout(() => { label.textContent = 'Sauvegarder'; btn.disabled = false; }, 2500);
@@ -1724,7 +1776,7 @@ function adminRenderList() {
   const list     = document.getElementById('entry-list');
   list.innerHTML = '';
 
-  const label = { films: 'film', series: 'série', anime: 'animé' }[adminTab];
+  const label = { films: 'film', series: 'série', anime: 'animé', watchlist: 'titre' }[adminTab];
   const countEl = document.getElementById('admin-count-label');
   countEl.textContent = query
     ? `${filtered.length} / ${items.length} ${label}${items.length > 1 ? 's' : ''}`
@@ -1796,7 +1848,7 @@ function adminDeleteEntry(idx) {
 // ── Add / Edit modal ──────────────────────────────────────────
 function openAdminModal(idx = null) {
   adminEditingIdx  = idx;
-  const isFilm     = adminTab === 'films';
+  const isFilm     = adminTab === 'films' || adminTab === 'watchlist';
 
   document.getElementById('film-fields').classList.toggle('hidden', !isFilm);
   document.getElementById('series-fields').classList.toggle('hidden', isFilm);
@@ -1856,7 +1908,7 @@ document.addEventListener('keydown', e => {
 // ── Form submit ───────────────────────────────────────────────
 document.getElementById('entry-form').addEventListener('submit', e => {
   e.preventDefault();
-  const isFilm = adminTab === 'films';
+  const isFilm = adminTab === 'films' || adminTab === 'watchlist';
 
   const entry = {
     title:  document.getElementById('f-title').value.trim(),
@@ -1922,17 +1974,25 @@ async function adminTmdbSearch() {
   resultsEl.innerHTML = '<p class="tmdb-msg">Recherche…</p>';
   try {
     const isFilm   = adminTab === 'films';
+    const isWatch  = adminTab === 'watchlist';
     const endpoint = isFilm
       ? `/search/movie?query=${encodeURIComponent(query)}`
-      : `/search/tv?query=${encodeURIComponent(query)}`;
+      : isWatch
+        ? `/search/multi?query=${encodeURIComponent(query)}`
+        : `/search/tv?query=${encodeURIComponent(query)}`;
     const json     = await adminTmdbFetch(endpoint);
-    const results  = (json.results || []).slice(0, 8).map(r => ({
-      id:     r.id,
-      title:  isFilm ? r.title : r.name,
-      year:   isFilm ? r.release_date?.slice(0, 4) : r.first_air_date?.slice(0, 4),
-      poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
-      type:   isFilm ? 'movie' : 'tv',
-    }));
+    const results  = (json.results || [])
+      .filter(r => !isWatch || r.media_type === 'movie' || r.media_type === 'tv')
+      .slice(0, 8).map(r => {
+        const isMov = isFilm || (isWatch && r.media_type === 'movie');
+        return {
+          id:     r.id,
+          title:  isMov ? r.title : r.name,
+          year:   isMov ? r.release_date?.slice(0, 4) : r.first_air_date?.slice(0, 4),
+          poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
+          type:   isMov ? 'movie' : 'tv',
+        };
+      });
 
     if (!results.length) { resultsEl.innerHTML = '<p class="tmdb-msg">Aucun résultat.</p>'; return; }
 

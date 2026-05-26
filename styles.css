@@ -971,7 +971,7 @@ header {
 .grid {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   max-width: 1000px;
   width: 100%;
   margin: 0 auto;
@@ -1418,6 +1418,33 @@ header {
   flex-direction: column;
   gap: 6px;
   margin-top: 8px;
+}
+
+.modal-transfer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-transfer-btn {
+  width: 100%;
+  background: color-mix(in srgb, var(--accent) 15%, #1a1a1a);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: center;
+}
+.modal-transfer-btn:hover {
+  background: color-mix(in srgb, var(--accent) 28%, #1a1a1a);
+}
+.modal-transfer-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .modal-recommend-btn {
@@ -3027,8 +3054,8 @@ header {
 
 
   .grid { 
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
     padding: 24px;
     padding-top: 12px;
   }
@@ -3095,5 +3122,9 @@ header {
 
   .top-col-title-long  { display: none; }
   .top-col-title-short { display: inline; }
+
+  .top-col {
+  height: 36px;
+}
   
 }
