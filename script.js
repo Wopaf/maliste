@@ -1103,13 +1103,13 @@ function render() {
     if (rating !== 0) {
       const starsDiv = document.createElement('div');
       starsDiv.className = 'card-stars';
-      starsDiv.textContent = `★ ${rating}`;
+      starsDiv.textContent = `${rating}`;
       a.appendChild(starsDiv);
     }
 
     const info = document.createElement("div");
     info.className = "card-info";
-    info.innerHTML = `<span class="card-title">${item.title}</span>${item.year ? `<span class="card-year">${item.year}</span>` : ''}`;
+    info.innerHTML = `<span class="card-title">${item.title}</span>`;
 
     wrapper.appendChild(a);
     wrapper.appendChild(info);
@@ -1134,7 +1134,24 @@ tabs.forEach(tab => {
 // ── Search suggestions ──────────────────────────────────────
 const suggestionList = document.createElement("ul");
 suggestionList.className = "search-suggestions";
-searchInput.parentElement.appendChild(suggestionList);
+document.body.appendChild(suggestionList);
+
+function positionSuggestions() {
+  const rect = searchInput.parentElement.getBoundingClientRect();
+  suggestionList.style.top = (rect.bottom + 6) + 'px';
+  if (window.innerWidth <= 700) {
+    suggestionList.style.left  = '0px';
+    suggestionList.style.right = '0px';
+    suggestionList.style.width = '';
+  } else {
+    suggestionList.style.left  = rect.left + 'px';
+    suggestionList.style.right = (window.innerWidth - rect.right) + 'px';
+    suggestionList.style.width = '';
+  }
+}
+window.addEventListener('resize', () => {
+  if (suggestionList.style.display === 'block') positionSuggestions();
+});
 
 function buildSuggestions(query) {
   if (!query) return [];
@@ -1179,6 +1196,7 @@ function showSuggestions(query) {
       <span class="suggestion-type">${item.type}</span>
     </li>`
   ).join("");
+  positionSuggestions();
   suggestionList.style.display = "block";
 
   suggestionList.querySelectorAll(".suggestion-item").forEach(el => {
