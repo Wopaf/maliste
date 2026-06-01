@@ -15,7 +15,7 @@ setTimeout(() => {
   const loader = document.getElementById('page-loader');
   loader.classList.add('fade-out');
   loader.addEventListener('transitionend', () => loader.remove(), { once: true });
-}, 150);
+}, 650);
 
 firebase.initializeApp(FIREBASE_CONFIG);
 const db   = firebase.database();
@@ -29,6 +29,11 @@ let series    = [];
 let anime     = [];
 let watchlist = [];
 let _dataReady = false;
+
+let currentRenderData = [];
+let gridPage = 1;
+let gridColCount = 4;
+const GRID_ROWS_PER_PAGE = 6;
 
 const homePage = document.getElementById('home-page');
 const mainApp  = document.getElementById('main-app');
@@ -89,6 +94,7 @@ function loadUserData(uid) {
     currentRecFilm   = d.recommendationFilm   || null;
     currentRecSeries = d.recommendationSeries || null;
     _dataReady = true;
+    loadDisplayPrefs(uid);
     buildGenreFilters(currentTab === 'films' ? films : currentTab === 'watchlist' ? watchlist : [...series, ...anime]);
     renderRecommendation();
     if (!homePage.classList.contains('hidden')) populateHomePage();
@@ -288,7 +294,10 @@ function toggleUserMenu(anchor, e) {
 }
 
 userBtn.addEventListener    ('click', e => toggleUserMenu(userBtn,     e));
-homeUserBtn.addEventListener('click', e => toggleUserMenu(homeUserBtn, e));
+homeUserBtn.addEventListener('click', e => {
+  if (currentViewUid !== currentUser?.uid) return;
+  toggleUserMenu(homeUserBtn, e);
+});
 
 document.addEventListener('click', () => userMenu.classList.remove('open'));
 userMenu.addEventListener('click', e => e.stopPropagation());
@@ -437,10 +446,106 @@ const ACCENT_COLORS = [
 ];
 let epSelectedColor  = null;
 let epSelectedAvatar = null;
+let epSelectedCover  = null;
 
 function applyAccentColor(color) {
   document.documentElement.style.setProperty('--accent', color);
 }
+
+// ── Image picker modal ───────────────────────────────────────
+let _imgPickerMode = null; // 'avatar' | 'cover'
+let _imgPickerSelected = null;
+
+function openImgPicker(mode) {
+  _imgPickerMode = mode;
+  _imgPickerSelected = mode === 'cover' ? epSelectedCover : epSelectedAvatar;
+
+  const modal = document.getElementById('img-picker-modal');
+  const grid  = document.getElementById('img-picker-grid');
+  const title = document.getElementById('img-picker-title');
+  const search = document.getElementById('img-picker-search');
+
+  title.textContent = mode === 'cover' ? 'Image de couverture' : 'Photo de profil';
+  search.value = '';
+  grid.className = 'img-picker-grid ' + (mode === 'cover' ? 'grid-cover' : 'grid-avatar');
+  modal.classList.remove('hidden');
+  renderImgPickerGrid('');
+  search.focus();
+}
+
+const IMG_PICKER_PAGE = 10;
+
+function renderImgPickerGrid(query, visibleCount = IMG_PICKER_PAGE) {
+  const grid = document.getElementById('img-picker-grid');
+  const q = query.toLowerCase();
+  grid.innerHTML = '';
+
+  let items;
+  if (_imgPickerMode === 'cover') {
+    const seen = new Set();
+    items = [...films, ...series, ...anime].filter(i => i.backdrop && !seen.has(i.backdrop) && seen.add(i.backdrop))
+      .filter(i => !q || i.title?.toLowerCase().includes(q))
+      .map(i => ({ url: i.backdrop, label: i.title, ratio: '16/9' }));
+  } else {
+    const seen = new Set();
+    items = [...films, ...series, ...anime].filter(i => i.poster && !seen.has(i.poster) && seen.add(i.poster))
+      .filter(i => !q || i.title?.toLowerCase().includes(q))
+      .map(i => ({ url: i.poster, label: i.title, ratio: '2/3' }));
+  }
+
+  if (!items.length) {
+    grid.innerHTML = '<p style="font-size:12px;color:#555;grid-column:1/-1;padding:12px 0">Aucun résultat.</p>';
+    return;
+  }
+
+  items.slice(0, visibleCount).forEach(({ url, label, ratio }) => {
+    const btn = document.createElement('button');
+    btn.className = 'ep-cover-item' + (url === _imgPickerSelected ? ' selected' : '');
+    btn.style.aspectRatio = ratio;
+    btn.title = label || '';
+    btn.innerHTML = `<img src="${url}" alt="${label || ''}" loading="lazy" />`;
+    btn.addEventListener('click', () => {
+      _imgPickerSelected = url;
+      grid.querySelectorAll('.ep-cover-item').forEach(el => el.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+    grid.appendChild(btn);
+  });
+
+  if (items.length > visibleCount) {
+    const more = document.createElement('button');
+    more.className = 'admin-list-more-btn';
+    more.style.gridColumn = '1 / -1';
+    more.textContent = `Voir ${Math.min(IMG_PICKER_PAGE, items.length - visibleCount)} de plus`;
+    more.addEventListener('click', () => renderImgPickerGrid(query, visibleCount + IMG_PICKER_PAGE));
+    grid.appendChild(more);
+  }
+}
+
+function closeImgPicker() {
+  document.getElementById('img-picker-modal').classList.add('hidden');
+  _imgPickerMode = null;
+}
+
+document.getElementById('img-picker-search').addEventListener('input', e => {
+  renderImgPickerGrid(e.target.value.trim(), IMG_PICKER_PAGE);
+});
+document.getElementById('img-picker-close').addEventListener('click', closeImgPicker);
+document.getElementById('img-picker-cancel').addEventListener('click', closeImgPicker);
+document.getElementById('img-picker-confirm').addEventListener('click', () => {
+  if (_imgPickerMode === 'cover') {
+    epSelectedCover = _imgPickerSelected;
+    const coverImg = document.getElementById('ep-cover-img');
+    if (coverImg) coverImg.src = epSelectedCover || '';
+  } else {
+    epSelectedAvatar = _imgPickerSelected;
+    const preview = document.getElementById('ep-avatar-preview');
+    if (epSelectedAvatar) {
+      preview.innerHTML = `<img src="${epSelectedAvatar}" alt="avatar" />`;
+    }
+  }
+  closeImgPicker();
+});
 
 function openEditProfileModal() {
   userMenu.classList.remove('open');
@@ -462,9 +567,10 @@ function openEditProfileModal() {
     }
     preview.style.borderColor = epSelectedColor;
 
+    epSelectedCover = p.coverImage || null;
+    const coverImg = document.getElementById('ep-cover-img');
+    if (coverImg) coverImg.src = epSelectedCover || '';
     renderEpColorSwatches(epSelectedColor);
-    renderEpAvatarPicker(p.avatar);
-    document.getElementById('ep-avatar-picker').classList.add('hidden');
     editProfileModal.classList.add('open');
   });
 }
@@ -487,30 +593,6 @@ function renderEpColorSwatches(selectedColor) {
   });
 }
 
-function renderEpAvatarPicker(currentAvatarUrl) {
-  const picker = document.getElementById('ep-avatar-picker');
-  const posters = [...new Set(
-    [...films, ...series, ...anime].filter(i => i.poster).map(i => i.poster)
-  )];
-  if (!posters.length) {
-    picker.innerHTML = '<p style="color:#555;font-size:12px;padding:4px 0">Aucune affiche disponible.</p>';
-    return;
-  }
-  picker.innerHTML = '';
-  posters.forEach(url => {
-    const img = document.createElement('img');
-    img.src       = url;
-    img.className = 'ep-avatar-item' + (url === currentAvatarUrl ? ' selected' : '');
-    img.addEventListener('click', () => {
-      epSelectedAvatar = url;
-      const preview = document.getElementById('ep-avatar-preview');
-      preview.innerHTML = `<img src="${url}" alt="avatar" />`;
-      picker.querySelectorAll('.ep-avatar-item').forEach(i => i.classList.remove('selected'));
-      img.classList.add('selected');
-    });
-    picker.appendChild(img);
-  });
-}
 
 async function saveEditProfile() {
   if (!currentUser) return;
@@ -544,9 +626,19 @@ async function saveEditProfile() {
     updates[`profiles/${currentUser.uid}/accentColor`] = epSelectedColor;
     applyAccentColor(epSelectedColor);
   }
+  if (epSelectedCover !== undefined) {
+    updates[`profiles/${currentUser.uid}/coverImage`] = epSelectedCover || null;
+  }
 
   await db.ref().update(updates);
   saveBtn.disabled = false;
+
+  const coverImg = document.getElementById('home-header-bg');
+  if (coverImg && epSelectedCover) {
+    coverImg.src = epSelectedCover;
+    coverImg.style.display = 'block';
+  }
+
   closeEditProfileModal();
 }
 
@@ -555,22 +647,26 @@ function closeEditProfileModal() {
 }
 
 document.getElementById('edit-profile-btn').addEventListener('click', openEditProfileModal);
+document.getElementById('ep-cover-zone').addEventListener('click', () => openImgPicker('cover'));
+document.getElementById('ep-change-avatar-btn').addEventListener('click', () => openImgPicker('avatar'));
+document.getElementById('ep-avatar-preview').addEventListener('click', () => openImgPicker('avatar'));
 document.getElementById('edit-profile-close').addEventListener('click', closeEditProfileModal);
 document.getElementById('ep-cancel-btn').addEventListener('click', closeEditProfileModal);
 document.getElementById('ep-save-btn').addEventListener('click', saveEditProfile);
-const _toggleEpPicker = () => document.getElementById('ep-avatar-picker').classList.toggle('hidden');
-document.getElementById('ep-change-avatar-btn').addEventListener('click', _toggleEpPicker);
-document.getElementById('ep-avatar-preview').addEventListener('click', _toggleEpPicker);
 editProfileModal.addEventListener('click', e => { if (e.target === editProfileModal) closeEditProfileModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && editProfileModal.classList.contains('open')) closeEditProfileModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (!document.getElementById('img-picker-modal').classList.contains('hidden')) { closeImgPicker(); return; }
+    if (editProfileModal.classList.contains('open')) closeEditProfileModal();
+  }
+});
 
 function switchToUser(uid) {
   currentViewUid   = uid;
   currentTab       = 'films';
   currentGenre     = 'Tous';
   currentStarFilter = 'all';
-  document.querySelectorAll('.tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.tab === 'films'));
+  adminDataLoaded  = false;
   loadUserData(uid);
   userMenu.classList.remove('open');
   updateViewingBanner();
@@ -590,10 +686,20 @@ document.getElementById('home-back-btn').addEventListener('click', () => {
   showHomePage();
 });
 
-document.getElementById('edit-lists-link').addEventListener('click', e => {
+document.getElementById('edit-lists-link')?.addEventListener('click', e => {
   e.preventDefault();
   if (currentUser) openAdminPanel();
 });
+['sidebar-edit-btn', 'sm-sidebar-edit-btn'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', () => {
+    if (currentUser) { closeSideMenu(); openAdminPanel(); }
+  });
+});
+
+['export-letterboxd-btn', 'sm-export-letterboxd-btn'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', () => { exportToLetterboxd(); closeSideMenu(); });
+});
+
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
   userMenu.classList.remove('open');
@@ -638,7 +744,7 @@ async function updateHomeHeaderForUid(uid) {
   const watchTitle    = document.getElementById('home-strip-watchlist-title');
   if (filmsTitle)  filmsTitle.textContent  = 'Ses Films';
   if (seriesTitle) seriesTitle.textContent = 'Ses Séries';
-  if (watchTitle)  watchTitle.textContent  = 'Sa liste À voir';
+  if (watchTitle)  watchTitle.textContent  = 'Sa Watchlist';
 }
 
 function restoreOwnHomeHeader() {
@@ -664,7 +770,7 @@ function restoreOwnHomeHeader() {
     const watchTitle  = document.getElementById('home-strip-watchlist-title');
     if (filmsTitle)  filmsTitle.textContent  = 'Films';
     if (seriesTitle) seriesTitle.textContent = 'Séries';
-    if (watchTitle)  watchTitle.textContent  = 'À voir';
+    if (watchTitle)  watchTitle.textContent  = 'Ma Watchlist';
   });
 }
 
@@ -680,26 +786,62 @@ function showHomePage() {
     switchToUser(currentUser.uid);
     restoreOwnHomeHeader();
   }
-  homePage.classList.remove('hidden');
-  mainApp.classList.add('hidden');
-  updateHomeViewingBanner();
-  populateHomePage();
+  mainApp.classList.add('sliding-out');
+  setTimeout(() => {
+    mainApp.classList.remove('sliding-out');
+    mainApp.classList.add('hidden');
+    homePage.classList.remove('hidden');
+    homePage.classList.remove('slide-in');
+    void homePage.offsetWidth;
+    homePage.classList.add('slide-in');
+    updateHomeViewingBanner();
+    populateHomePage();
+  }, 300);
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  currentGenre = 'Tous';
+  currentStarFilter = 'all';
+  searchInput.value = '';
+  const data = currentTab === 'films' ? films : currentTab === 'watchlist' ? watchlist : [...series, ...anime];
+  buildGenreFilters(data);
+  renderRecommendation();
+  render();
 }
 
 function navigateToApp(tab) {
   homePage.classList.add('hidden');
   mainApp.classList.remove('hidden');
-  if (tab) {
-    const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
-    if (btn) btn.click();
-  }
+  if (tab) switchTab(tab);
+  else render();
 }
 
 function populateHomePage() {
   fillStrip('home-strip-films',     [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)), films.length);
   fillStrip('home-strip-series',    [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length);
-  fillStrip('home-strip-watchlist', [...watchlist], watchlist.length);
+  fillStrip('home-strip-watchlist', [...watchlist], watchlist.length, true, 10, 2);
   fillCommunityStrip();
+
+  const coverImg = document.getElementById('home-header-bg');
+  if (coverImg) {
+    db.ref(`profiles/${currentViewUid}/coverImage`).once('value').then(snap => {
+      const saved = snap.val();
+      if (saved) {
+        coverImg.src = saved;
+        coverImg.style.display = 'block';
+      } else {
+        const allItems = [...films, ...series, ...anime].filter(i => i.backdrop || i.poster);
+        const topItem  = allItems.sort((a, b) => (b.stars || 0) - (a.stars || 0))[0];
+        if (topItem) {
+          coverImg.src = topItem.backdrop || topItem.poster;
+          coverImg.style.display = 'block';
+        } else {
+          coverImg.style.display = 'none';
+        }
+      }
+    });
+  }
 
   const statsEl = document.getElementById('home-profile-stats');
   if (statsEl) {
@@ -707,10 +849,9 @@ function populateHomePage() {
     const sc = series.length + anime.length;
     const wc = watchlist.length;
     statsEl.innerHTML = `
-      <span class="home-stat"><strong>${fc}</strong> film${fc !== 1 ? 's' : ''}</span>
-      <span class="home-stat-sep"></span>
-      <span class="home-stat"><strong>${sc}</strong> série${sc !== 1 ? 's' : ''}</span>
-      ${wc > 0 ? `<span class="home-stat-sep"></span><span class="home-stat"><strong>${wc}</strong> à voir</span>` : ''}
+      <div class="home-stat"><strong>${fc}</strong><span>Films</span></div>
+      <div class="home-stat"><strong>${sc}</strong><span>Séries</span></div>
+      <div class="home-stat"><strong>${wc}</strong><span>Watchlist</span></div>
     `;
   }
 }
@@ -784,7 +925,7 @@ function fillCommunityStrip() {
   });
 }
 
-function fillStrip(stripId, items, total) {
+function fillStrip(stripId, items, total, showAddBtn = false, maxItems = 7, extraOverlap = 2.5) {
   const strip = document.getElementById(stripId);
   if (!strip) return;
   strip.innerHTML = '';
@@ -792,12 +933,12 @@ function fillStrip(stripId, items, total) {
   const row = document.createElement('div');
   row.className = 'home-carousel-row';
 
-  const MIN_SLOTS = 7;
-  const displayed = items.slice(0, 7);
+  const displayed = items.slice(0, maxItems);
 
-  displayed.forEach(item => {
+  displayed.forEach((item, i) => {
     const card = document.createElement('div');
     card.className = 'home-carousel-card';
+    card.style.zIndex = displayed.length - i;
     if (item.poster) {
       const img = document.createElement('img');
       img.src = item.poster; img.alt = item.title; img.loading = 'lazy';
@@ -811,14 +952,43 @@ function fillStrip(stripId, items, total) {
     row.appendChild(card);
   });
 
+  const MIN_SLOTS = maxItems;
   for (let i = displayed.length; i < MIN_SLOTS; i++) {
     const ghost = document.createElement('div');
     ghost.className = 'home-carousel-card home-carousel-ghost';
+    ghost.style.zIndex = displayed.length - i;
     row.appendChild(ghost);
   }
 
-  strip.appendChild(row);
+  if (showAddBtn) {
+    const wrap = document.createElement('div');
+    wrap.className = 'home-carousel-add-wrap';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'home-carousel-add-btn';
+    addBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+    addBtn.addEventListener('click', quickAddToWatchlist);
+    wrap.appendChild(row);
+    wrap.appendChild(addBtn);
+    strip.appendChild(wrap);
+  } else {
+    strip.appendChild(row);
+  }
 
+  attachCarouselOverlap(row, extraOverlap);
+}
+
+function attachCarouselOverlap(row, extraOverlap = 2.5) {
+  const compute = () => {
+    const cards = row.querySelectorAll('.home-carousel-card');
+    if (cards.length < 2) return;
+    const containerW = row.offsetWidth;
+    const cardW = cards[0].offsetWidth;
+    const n = cards.length;
+    const overlap = Math.max(4, (n * cardW - containerW) / (n - 1)) + extraOverlap;
+    row.style.setProperty('--carousel-overlap', `${overlap}px`);
+  };
+  requestAnimationFrame(compute);
+  new ResizeObserver(compute).observe(row);
 }
 
 // ── État d'authentification ───────────────────────────────────
@@ -837,6 +1007,8 @@ auth.onAuthStateChanged(user => {
       document.getElementById('user-initials').textContent            = pseudo[0].toUpperCase();
       document.getElementById('home-user-initials').textContent       = pseudo[0].toUpperCase();
       document.getElementById('home-app-title').textContent           = pseudo;
+      const emailEl = document.getElementById('home-app-email');
+      if (emailEl) emailEl.textContent = user.email || '';
       if (d.avatar) setAvatarDisplay(d.avatar);
       if (d.accentColor) applyAccentColor(d.accentColor);
     });
@@ -874,6 +1046,53 @@ auth.onAuthStateChanged(user => {
 let currentTab = "films";
 let currentGenre = "Tous";
 let currentSort = localStorage.getItem("sort") ?? "alpha-asc";
+let currentStarFilter = 'all';
+
+// ── Préférences d'affichage ───────────────────────────────────
+const displayPrefs = { showTitles: false, showDates: false, showRatings: false };
+
+function applyDisplayPrefs() {
+  grid.classList.toggle('show-titles',  displayPrefs.showTitles);
+  grid.classList.toggle('show-dates',   displayPrefs.showDates);
+  grid.classList.toggle('show-ratings', displayPrefs.showRatings);
+  ['pref-titles', 'sm-pref-titles'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = displayPrefs.showTitles; });
+  ['pref-dates',  'sm-pref-dates' ].forEach(id => { const el = document.getElementById(id); if (el) el.checked = displayPrefs.showDates; });
+  ['pref-ratings','sm-pref-ratings'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = displayPrefs.showRatings; });
+  ['pref-compact','sm-pref-compact'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = grid.classList.contains('compact'); });
+}
+
+async function saveDisplayPrefs() {
+  if (!currentUser) return;
+  await db.ref(`users/${currentUser.uid}/displayPrefs`).set(displayPrefs);
+}
+
+async function loadDisplayPrefs(uid) {
+  const snap = await db.ref(`users/${uid}/displayPrefs`).once('value');
+  const saved = snap.val();
+  if (saved) {
+    displayPrefs.showTitles  = saved.showTitles  ?? false;
+    displayPrefs.showDates   = saved.showDates   ?? false;
+    displayPrefs.showRatings = saved.showRatings ?? false;
+  } else {
+    displayPrefs.showTitles  = false;
+    displayPrefs.showDates   = false;
+    displayPrefs.showRatings = true;
+  }
+  applyDisplayPrefs();
+}
+
+const prefKeyMap = { 'pref-titles': 'showTitles', 'pref-dates': 'showDates', 'pref-ratings': 'showRatings',
+                     'sm-pref-titles': 'showTitles', 'sm-pref-dates': 'showDates', 'sm-pref-ratings': 'showRatings' };
+Object.keys(prefKeyMap).forEach(id => {
+  document.getElementById(id)?.addEventListener('change', e => {
+    displayPrefs[prefKeyMap[id]] = e.target.checked;
+    applyDisplayPrefs();
+    saveDisplayPrefs();
+  });
+});
+['pref-compact', 'sm-pref-compact'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', e => setCompactLayout(e.target.checked));
+});
 
 const grid = document.getElementById("grid");
 const searchInput = document.getElementById("search");
@@ -881,20 +1100,21 @@ const tabs = document.querySelectorAll(".tab");
 
 const sortDropdown = document.getElementById("sort-dropdown");
 const genreDropdown = document.getElementById("genre-dropdown");
-const compactFbarBtn = document.getElementById("compact-fbar-btn");
 const compactSideBtn = document.getElementById("compact-side-btn");
 
 function setCompactLayout(compact) {
   grid.classList.toggle("compact", compact);
-  compactFbarBtn.classList.toggle("active", compact);
   compactSideBtn.classList.toggle("active", compact);
+  const cb = document.getElementById("pref-compact");
+  if (cb) cb.checked = compact;
   localStorage.setItem("compactLayout", compact ? "1" : "0");
 }
 
-if (localStorage.getItem("compactLayout") === "1") setCompactLayout(true);
+const savedCompact = localStorage.getItem("compactLayout");
+setCompactLayout(savedCompact === null ? true : savedCompact === "1");
 
-compactFbarBtn.addEventListener("click", () => setCompactLayout(!grid.classList.contains("compact")));
 compactSideBtn.addEventListener("click", () => { setCompactLayout(!grid.classList.contains("compact")); closeSideMenu(); });
+document.getElementById("pref-compact").addEventListener("change", e => setCompactLayout(e.target.checked));
 
 const fBarToggle = document.getElementById("f-bar-toggle");
 const fBarControls = document.getElementById("f-bar-controls");
@@ -1017,6 +1237,9 @@ function render() {
     data = data.filter(item => (item.genre ?? []).includes(currentGenre));
   }
 
+  if (currentStarFilter !== 'all') {
+    data = data.filter(item => (item.stars ?? 0) === currentStarFilter);
+  }
 
   if (query) {
     data = data.filter(item =>
@@ -1026,24 +1249,31 @@ function render() {
     );
   }
 
-  const countEl = document.getElementById("result-count");
-  const timeEl  = document.getElementById("time-count");
-  if (countEl) {
-    const label = currentTab === "films" ? "film" : currentTab === "series" ? "série" : currentTab === "watchlist" ? "titre" : "animé";
-    countEl.textContent = `${data.length} ${label}${data.length > 1 ? "s" : ""}`;
-  }
-  if (timeEl) {
+  const setCount = (id, text, show = true) => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = text; el.style.display = show ? '' : 'none'; }
+  };
+  if (currentTab === "watchlist") {
+    const wFilms  = data.filter(i => !(i.seasons || i.episodes)).length;
+    const wSeries = data.filter(i => !!(i.seasons || i.episodes)).length;
+    setCount('result-count', `${wFilms} film${wFilms > 1 ? 's' : ''}`);
+    setCount('sm-result-count', `${wFilms} film${wFilms > 1 ? 's' : ''}`);
+    setCount('time-count', `${wSeries} série${wSeries > 1 ? 's' : ''}`);
+    setCount('sm-time-count', `${wSeries} série${wSeries > 1 ? 's' : ''}`);
+  } else {
+    const label = currentTab === "films" ? "film" : currentTab === "series" ? "série" : "animé";
+    setCount('result-count', `${data.length} ${label}${data.length > 1 ? "s" : ""}`);
+    setCount('sm-result-count', `${data.length} ${label}${data.length > 1 ? "s" : ""}`);
     if (currentTab !== 'films') {
-      timeEl.textContent = '';
-      timeEl.style.display = 'none';
+      setCount('time-count', '', false);
+      setCount('sm-time-count', '', false);
     } else {
       const totalMin = data.reduce((sum, item) => sum + parseTime(item.time), 0);
       const h = Math.round(totalMin / 60);
-      timeEl.textContent = `Estimation : ${h}h`;
-      timeEl.style.display = '';
+      setCount('time-count', `Estimation : ${h}h`);
+      setCount('sm-time-count', `Estimation : ${h}h`);
     }
   }
-
   const topSection = document.getElementById('top-section');
   if (topSection) topSection.style.display = (query || currentTab === 'watchlist') ? 'none' : '';
 
@@ -1051,70 +1281,122 @@ function render() {
 
   if (data.length === 0) {
     grid.innerHTML = '<p class="empty">Aucun résultat.</p>';
+    updateLoadMoreBtn(0, 0);
     return;
   }
 
-  data.forEach((item, index) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "card-wrapper";
-    wrapper.style.animationDelay = `${index * 15}ms`;
-    wrapper.addEventListener('animationend', () => {
-      wrapper.style.animation = 'none';
-      wrapper.style.opacity = '1';
-    }, { once: true });
+  currentRenderData = data;
+  gridPage = 1;
+  data.forEach((item, index) => grid.appendChild(createCardWrapper(item, index)));
+  requestAnimationFrame(applyGridPagination);
+  updateStatsSidebar();
+}
 
-    const a = document.createElement("a");
-    a.className = "card";
-    a.href = item.url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
+function createCardWrapper(item, index) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "card-wrapper";
+  wrapper.style.animationDelay = `${index * 15}ms`;
+  wrapper.addEventListener('animationend', () => {
+    wrapper.style.animation = 'none';
+    wrapper.style.opacity = '1';
+  }, { once: true });
 
-    let longPressTimer = null;
-    let longPressFired = false;
-    a.addEventListener('pointerdown', () => {
-      longPressFired = false;
-      longPressTimer = setTimeout(() => {
-        if (item.poster) {
-          longPressFired = true;
-          openPosterZoom(item.poster);
-        }
-      }, 450);
-    });
-    a.addEventListener('pointerup', () => clearTimeout(longPressTimer));
-    a.addEventListener('pointercancel', () => clearTimeout(longPressTimer));
-    a.addEventListener('pointermove', () => clearTimeout(longPressTimer));
+  const a = document.createElement("a");
+  a.className = "card";
+  a.href = item.url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
 
-    a.addEventListener('click', e => {
-      if (longPressFired) { e.preventDefault(); longPressFired = false; return; }
-      if (!e.ctrlKey && !e.metaKey && e.button !== 1) {
-        e.preventDefault();
-        openModal(item, a);
+  let longPressTimer = null;
+  let longPressFired = false;
+  a.addEventListener('pointerdown', () => {
+    longPressFired = false;
+    longPressTimer = setTimeout(() => {
+      if (item.poster) {
+        longPressFired = true;
+        openPosterZoom(item.poster);
       }
-    });
-    if (item.bgColor)     a.style.setProperty("--card-bg",      item.bgColor);
-    if (item.borderColor) a.style.setProperty("--card-border",  item.borderColor);
-    if (item.accentColor) a.style.setProperty("--card-accent",  item.accentColor);
-
-    a.innerHTML = item.poster
-      ? `<img src="${item.poster}" alt="${item.title}" loading="lazy" />`
-      : `<div class="card-no-poster"></div>`;
-
-    const rating = getStars(item.title);
-    if (rating !== 0) {
-      const starsDiv = document.createElement('div');
-      starsDiv.className = 'card-stars';
-      starsDiv.textContent = `${rating}`;
-      a.appendChild(starsDiv);
-    }
-
-    const info = document.createElement("div");
-    info.className = "card-info";
-    info.innerHTML = `<span class="card-title">${item.title}</span>`;
-
-    wrapper.appendChild(a);
-    wrapper.appendChild(info);
-    grid.appendChild(wrapper);
+    }, 450);
   });
+  a.addEventListener('pointerup', () => clearTimeout(longPressTimer));
+  a.addEventListener('pointercancel', () => clearTimeout(longPressTimer));
+  a.addEventListener('pointermove', () => clearTimeout(longPressTimer));
+
+  a.addEventListener('click', e => {
+    if (longPressFired) { e.preventDefault(); longPressFired = false; return; }
+    if (!e.ctrlKey && !e.metaKey && e.button !== 1) {
+      e.preventDefault();
+      openModal(item, a);
+    }
+  });
+  if (item.bgColor)     a.style.setProperty("--card-bg",      item.bgColor);
+  if (item.borderColor) a.style.setProperty("--card-border",  item.borderColor);
+  if (item.accentColor) a.style.setProperty("--card-accent",  item.accentColor);
+
+  a.innerHTML = item.poster
+    ? `<img src="${item.poster}" alt="${item.title}" loading="lazy" />`
+    : `<div class="card-no-poster"></div>`;
+
+  const rating = getStars(item.title);
+  if (rating !== 0) {
+    const starsDiv = document.createElement('div');
+    starsDiv.className = 'card-stars';
+    starsDiv.textContent = `${rating}`;
+    a.appendChild(starsDiv);
+  }
+
+  const info = document.createElement("div");
+  info.className = "card-info";
+  info.innerHTML = `<span class="card-title">${item.title}</span>${item.year ? `<span class="card-year">${item.year}</span>` : ''}`;
+
+  wrapper.appendChild(a);
+  wrapper.appendChild(info);
+  return wrapper;
+}
+
+function applyGridPagination() {
+  const cards = Array.from(grid.querySelectorAll('.card-wrapper'));
+  if (cards.length === 0) { updateLoadMoreBtn(0, 0); return; }
+
+  const firstTop = cards[0].offsetTop;
+  let cols = 0;
+  for (let i = 0; i < cards.length; i++) {
+    if (cards[i].offsetTop !== firstTop) break;
+    cols++;
+  }
+  if (cols === 0) cols = 1;
+  gridColCount = cols;
+
+  const limit = GRID_ROWS_PER_PAGE * cols;
+  for (let i = cards.length - 1; i >= limit; i--) {
+    cards[i].remove();
+  }
+
+  updateLoadMoreBtn(currentRenderData.length, Math.min(limit, cards.length));
+}
+
+function updateLoadMoreBtn(total, shown) {
+  const wrap = document.getElementById('load-more-wrap');
+  if (!wrap) return;
+  if (shown >= total) {
+    wrap.innerHTML = '';
+    wrap.style.display = 'none';
+    return;
+  }
+  const remaining = total - shown;
+  wrap.style.display = '';
+  wrap.innerHTML = `<button class="load-more-btn" id="load-more-btn">Voir plus <span class="load-more-count">${remaining} de plus</span></button>`;
+  document.getElementById('load-more-btn').addEventListener('click', loadMoreItems);
+}
+
+function loadMoreItems() {
+  gridPage++;
+  const start = GRID_ROWS_PER_PAGE * gridColCount * (gridPage - 1);
+  const end   = GRID_ROWS_PER_PAGE * gridColCount * gridPage;
+  currentRenderData.slice(start, end).forEach((item, i) => {
+    grid.appendChild(createCardWrapper(item, i));
+  });
+  updateLoadMoreBtn(currentRenderData.length, end);
 }
 
 tabs.forEach(tab => {
@@ -1227,31 +1509,33 @@ searchClear.addEventListener('click', () => {
 });
 
 function updatePersonBadge(query) {
-  const wrap = document.getElementById('person-badge-wrap');
-  if (!wrap) return;
-  wrap.innerHTML = '';
-  if (!query || query.length < 2) return;
-
-  const q = query.toLowerCase();
+  const q = query?.toLowerCase();
   const all = [...films, ...series, ...anime];
   const seen = new Set();
-
-  for (const item of all) {
-    if (item.director && item.director.toLowerCase().includes(q)) seen.add(item.director);
-    for (const name of (item.cast || [])) {
-      if (name.toLowerCase().includes(q)) seen.add(name);
+  if (q && q.length >= 2) {
+    for (const item of all) {
+      if (item.director && item.director.toLowerCase().includes(q)) seen.add(item.director);
+      for (const name of (item.cast || [])) { if (name.toLowerCase().includes(q)) seen.add(name); }
     }
   }
+  const matches = [...seen].slice(0, 4);
 
-  for (const name of [...seen].slice(0, 4)) {
-    const a = document.createElement('a');
-    a.className = 'person-badge';
-    a.href = `https://www.google.com/search?q=${encodeURIComponent(name + ' allociné')}`;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>${name}`;
-    wrap.appendChild(a);
-  }
+  [['sidebar-person-badges', 'sidebar-person-section'], ['sm-sidebar-person-badges', 'sm-sidebar-person-section']].forEach(([wrapId, secId]) => {
+    const wrap = document.getElementById(wrapId);
+    const section = document.getElementById(secId);
+    if (!wrap || !section) return;
+    wrap.innerHTML = '';
+    if (!matches.length) { section.style.display = 'none'; return; }
+    section.style.display = '';
+    for (const name of matches) {
+      const a = document.createElement('a');
+      a.className = 'person-badge';
+      a.href = `https://www.google.com/search?q=${encodeURIComponent(name + ' allociné')}`;
+      a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>${name}`;
+      wrap.appendChild(a);
+    }
+  });
 }
 
 searchInput.addEventListener("input", () => {
@@ -1380,26 +1664,29 @@ function openModal(item, triggerEl) {
   const isOwnWatchlist = !isGuest && isWatchlistItem;
   transferActions.classList.toggle('hidden', !isOwnWatchlist);
   if (isOwnWatchlist) {
-    document.getElementById('modal-transfer-films').onclick  = () => transferFromWatchlist(item, 'films');
-    document.getElementById('modal-transfer-series').onclick = () => transferFromWatchlist(item, 'series');
+    const isFilm   = !!(item.time);
+    const isSeries = !isFilm;
+    const filmsBtn  = document.getElementById('modal-transfer-films');
+    const seriesBtn = document.getElementById('modal-transfer-series');
+    filmsBtn.style.display  = isSeries ? 'none' : '';
+    seriesBtn.style.display = isFilm   ? 'none' : '';
+    filmsBtn.onclick  = () => transferFromWatchlist(item, 'films');
+    seriesBtn.onclick = () => transferFromWatchlist(item, 'series');
   }
 
-  const posterImg = document.getElementById('modal-poster-img');
+  const posterImg    = document.getElementById('modal-poster-img');
   const posterHeader = document.getElementById('modal-poster-header');
-  if (item.poster) {
-    posterImg.src = item.poster;
-    posterHeader.style.display = '';
-  } else {
-    posterImg.src = '';
-    posterHeader.style.display = 'none';
-  }
+  const filmPoster   = document.getElementById('modal-film-poster');
+  posterImg.src = item.backdrop || item.poster || '';
+  posterHeader.style.display = (item.backdrop || item.poster) ? '' : 'none';
+  if (filmPoster) filmPoster.src = item.poster || '';
 
-  modalBackdrop.classList.add('open');
+  modalBackdrop.classList.add('open', 'film-modal');
   modalEl.classList.add('open');
 }
 
 function closeModal() {
-  modalBackdrop.classList.remove('open');
+  modalBackdrop.classList.remove('open', 'film-modal');
   modalEl.classList.remove('open');
 }
 
@@ -1572,6 +1859,101 @@ document.getElementById('top-section-real-btn')?.addEventListener('click', e => 
 document.getElementById('top-section-cast-btn')?.addEventListener('click', e => { e.stopPropagation(); showTopPopup('cast'); });
 document.getElementById('top-popup-close')?.addEventListener('click', e => { e.stopPropagation(); closeTopPopup(); });
 
+// ── Stats Sidebar ─────────────────────────────────────────────
+function renderSidebarList(elId, items) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = items.map(([name, count], i) =>
+    `<li class="sidebar-item">
+      <span class="sidebar-rank">${i + 1}</span>
+      <span class="sidebar-name" data-search="${name.replace(/"/g, '&quot;')}">${name}</span>
+      <span class="sidebar-count">${count}</span>
+    </li>`
+  ).join('');
+  el.querySelectorAll('.sidebar-name').forEach(el => {
+    el.addEventListener('click', () => {
+      searchInput.value = el.dataset.search;
+      updateSearchClear();
+      closeSideMenu();
+      render();
+    });
+  });
+}
+
+function populateSidebarPair(id, smId, fn) {
+  fn(id); fn(smId);
+}
+
+function updateStatsSidebar() {
+  const isWatchlist = currentTab === 'watchlist';
+  const isSeries    = currentTab === 'series';
+  const hideTopSections = isSeries || isWatchlist;
+
+  ['sidebar-section-ratings', 'sm-sidebar-section-ratings'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isWatchlist ? 'none' : '';
+  });
+  ['sidebar-section-directors', 'sm-sidebar-section-directors'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = hideTopSections ? 'none' : '';
+  });
+  ['sidebar-section-actors', 'sm-sidebar-section-actors'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = hideTopSections ? 'none' : '';
+  });
+
+  if (!hideTopSections) {
+    const topDirs   = computeTop('director', 50);
+    const topActors = computeTop('cast', 50);
+    ['sidebar-directors', 'sm-sidebar-directors'].forEach(id => renderSidebarList(id, topDirs.slice(0, 10)));
+    ['sidebar-actors',    'sm-sidebar-actors'   ].forEach(id => renderSidebarList(id, topActors.slice(0, 10)));
+
+    ['sidebar-directors-more', 'sm-sidebar-directors-more'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) { btn.style.display = topDirs.length > 5 ? '' : 'none'; btn.onclick = () => showTopPopup('real'); }
+    });
+    ['sidebar-actors-more', 'sm-sidebar-actors-more'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) { btn.style.display = topActors.length > 5 ? '' : 'none'; btn.onclick = () => showTopPopup('cast'); }
+    });
+  }
+
+  const source   = currentTab === 'films' ? films : [...series, ...anime];
+  const rated    = source.filter(i => i.stars >= 0 && i.stars <= 10);
+  const total    = rated.length;
+  const counts   = Array(11).fill(0);
+  rated.forEach(i => { counts[Math.round(i.stars)]++; });
+  const maxCount = Math.max(...counts, 1);
+
+  const ratingsHtml = `
+    <div class="sidebar-ratings-header">
+      <span class="sidebar-ratings-label">Notes</span>
+      <span class="sidebar-ratings-total">${total}</span>
+    </div>
+    <div class="sidebar-ratings-chart">
+      ${counts.map((c, note) =>
+        `<div class="sidebar-bar-col${currentStarFilter === note ? ' active' : ''}" data-note="${note}" title="${note}/10 · ${c} film${c !== 1 ? 's' : ''}">
+          <div class="sidebar-bar" style="height:${c > 0 ? Math.max(Math.round((c / maxCount) * 100), 4) : 0}%"></div>
+        </div>`
+      ).join('')}
+    </div>
+    <div class="sidebar-ratings-stars"><span>0</span><span>10</span></div>
+  `;
+
+  ['sidebar-ratings', 'sm-sidebar-ratings'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = ratingsHtml;
+    el.querySelectorAll('.sidebar-bar-col').forEach(col => {
+      col.addEventListener('click', () => {
+        const note = parseInt(col.dataset.note, 10);
+        currentStarFilter = currentStarFilter === note ? 'all' : note;
+        render();
+      });
+    });
+  });
+}
+
 // ============================================================
 //  SIDE MENU MOBILE
 // ============================================================
@@ -1620,7 +2002,7 @@ function renderSideTabs() {
   const TAB_DEFS = [
     { key: 'films',     label: 'Films' },
     { key: 'series',    label: 'Séries' },
-    { key: 'watchlist', label: 'À voir' },
+    { key: 'watchlist', label: 'Watchlist' },
   ];
   const container = document.getElementById('side-tabs');
   container.innerHTML = '';
@@ -1629,7 +2011,7 @@ function renderSideTabs() {
     btn.className = 'side-tab-btn' + (currentTab === key ? ' active' : '');
     btn.textContent = label;
     btn.addEventListener('click', () => {
-      document.querySelector(`.tab[data-tab="${key}"]`)?.click();
+      navigateToApp(key);
       closeSideMenu();
     });
     container.appendChild(btn);
@@ -1653,12 +2035,13 @@ function renderSideSort() {
 
 function renderSideGenre() {
   const container = document.getElementById('side-genre-list');
+  if (!container) return;
   container.innerHTML = '';
   const genres = [...new Set(currentFilterData.flatMap(item => item.genre ?? []))].sort();
   ['Tous', ...genres].forEach(genre => {
-    const el = document.createElement('div');
-    el.className = 'side-sort-item' + (currentGenre === genre ? ' active' : '');
-    el.innerHTML = `<span>${genre}</span>${currentGenre === genre ? '<span class="side-sort-check">✓</span>' : ''}`;
+    const el = document.createElement('button');
+    el.className = 'side-genre-chip' + (currentGenre === genre ? ' active' : '');
+    el.textContent = genre;
     el.addEventListener('click', () => {
       currentGenre = genre;
       updateGenreDropdownLabel();
@@ -1684,17 +2067,36 @@ document.getElementById('home-strip-films')    .addEventListener('click', () => 
 document.getElementById('home-strip-series')   .addEventListener('click', () => navigateToApp('series'));
 document.getElementById('home-strip-watchlist').addEventListener('click', () => navigateToApp('watchlist'));
 
+function exportToLetterboxd() {
+  if (!films.length) { alert('Aucun film à exporter.'); return; }
+  const rows = [['Title', 'Year', 'Directors', 'Rating10']];
+  films.forEach(f => {
+    rows.push([
+      `"${(f.title    || '').replace(/"/g, '""')}"`,
+      f.year      || '',
+      `"${(f.director || '').replace(/"/g, '""')}"`,
+      f.stars     || '',
+    ]);
+  });
+  const csv  = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'letterboxd-import.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('export-letterboxd-btn').addEventListener('click', () => {
+  exportToLetterboxd();
+  closeSideMenu();
+});
+
 document.getElementById('menu-btn').addEventListener('click', openSideMenu);
 document.getElementById('side-menu-close').addEventListener('click', closeSideMenu);
 sideMenuBackdrop.addEventListener('click', closeSideMenu);
 
-document.querySelector('#side-sort-section .side-collapsible-header').addEventListener('click', () => {
-  document.getElementById('side-sort-section').classList.toggle('collapsed');
-});
-
-document.querySelector('#side-genre-section .side-collapsible-header').addEventListener('click', () => {
-  document.getElementById('side-genre-section').classList.toggle('collapsed');
-});
 
 
 // ============================================================
@@ -1704,15 +2106,19 @@ document.querySelector('#side-genre-section .side-collapsible-header').addEventL
 const TMDB_KEY = '528e49ad32fae0daa4734b34d9a758af';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
 
-let adminData       = { films: [], series: [], anime: [], watchlist: [] };
-let adminTab        = 'films';
-let adminEditingIdx = null;
+let adminData        = { films: [], series: [], anime: [], watchlist: [] };
+let adminDataLoaded  = false;
+let adminTab         = 'films';
+let adminEditingIdx  = null;
 
-function openAdminPanel() {
+let _adminFromHome = false;
+let _quickAddMode  = false;
+
+function openAdminPanel(fromHome = false) {
+  _adminFromHome = fromHome;
   userMenu.classList.remove('open');
   document.getElementById('admin-panel').classList.remove('hidden');
-  document.querySelectorAll('.a-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'films'));
-  adminTab = 'films';
+  adminTab = ['films', 'series', 'anime', 'watchlist'].includes(currentTab) ? currentTab : 'films';
   adminLoadData(currentUser.uid);
 }
 
@@ -1721,9 +2127,28 @@ function closeAdminPanel() {
   document.getElementById('admin-filter').value = '';
   document.getElementById('admin-search-bar').classList.remove('has-value');
   if (currentUser) loadUserData(currentUser.uid);
+  if (_adminFromHome) { _adminFromHome = false; showHomePage(); }
 }
 
 document.getElementById('admin-back-btn').addEventListener('click', closeAdminPanel);
+
+async function quickAddToWatchlist() {
+  if (!currentUser) return;
+  _quickAddMode = true;
+  if (!adminDataLoaded) {
+    const snap = await db.ref(`users/${currentUser.uid}`).once('value');
+    const d = snap.val() || {};
+    adminData = {
+      films:     Object.values(d.films     || {}),
+      series:    Object.values(d.series    || {}),
+      anime:     Object.values(d.anime     || {}),
+      watchlist: Object.values(d.watchlist || {}),
+    };
+    adminDataLoaded = true;
+  }
+  adminTab = 'watchlist';
+  openAdminModal(null);
+}
 
 // ── Load / Save ───────────────────────────────────────────────
 async function adminLoadData(uid) {
@@ -1735,6 +2160,7 @@ async function adminLoadData(uid) {
     anime:     Object.values(d.anime     || {}),
     watchlist: Object.values(d.watchlist || {}),
   };
+  adminDataLoaded = true;
   adminRenderList();
 }
 
@@ -1762,14 +2188,6 @@ async function adminSaveData() {
 document.getElementById('admin-save-btn').addEventListener('click', adminSaveData);
 
 // ── Tabs ──────────────────────────────────────────────────────
-document.querySelectorAll('.a-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.a-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    adminTab = tab.dataset.tab;
-    adminRenderList();
-  });
-});
 
 const adminFilterInput = document.getElementById('admin-filter');
 const adminSearchBarEl = document.getElementById('admin-search-bar');
@@ -1787,15 +2205,19 @@ adminFilterClear.addEventListener('click', () => {
 });
 
 // ── Render list ───────────────────────────────────────────────
-function adminRenderList() {
+const ADMIN_PAGE_SIZE = 50;
+
+function adminRenderList(visibleCount = ADMIN_PAGE_SIZE) {
+  const list    = document.getElementById('entry-list');
+  const countEl = document.getElementById('admin-count-label');
+  if (!list || !countEl) return;
+
   const items    = adminData[adminTab] || [];
-  const query    = adminFilterInput.value.toLowerCase();
+  const query    = adminFilterInput?.value.toLowerCase() ?? '';
   const filtered = query ? items.filter(i => i.title.toLowerCase().includes(query)) : items;
-  const list     = document.getElementById('entry-list');
   list.innerHTML = '';
 
   const label = { films: 'film', series: 'série', anime: 'animé', watchlist: 'titre' }[adminTab];
-  const countEl = document.getElementById('admin-count-label');
   countEl.textContent = query
     ? `${filtered.length} / ${items.length} ${label}${items.length > 1 ? 's' : ''}`
     : `${items.length} ${label}${items.length > 1 ? 's' : ''}`;
@@ -1805,7 +2227,9 @@ function adminRenderList() {
     return;
   }
 
-  filtered.forEach(item => {
+  const toShow = filtered.slice(0, visibleCount);
+
+  toShow.forEach(item => {
     const realIdx = items.indexOf(item);
     const el = document.createElement('div');
     el.className = 'entry-item';
@@ -1826,17 +2250,23 @@ function adminRenderList() {
         <span class="entry-meta">${meta}</span>
       </div>
       <div class="entry-actions">
-        <button class="btn-ghost btn-sm btn-edit" data-idx="${realIdx}">Éditer</button>
         <button class="btn-danger btn-sm btn-del"  data-idx="${realIdx}">✕</button>
       </div>
     `;
     list.appendChild(el);
   });
 
-  list.querySelectorAll('.btn-edit').forEach(btn =>
-    btn.addEventListener('click', () => openAdminModal(parseInt(btn.dataset.idx))));
   list.querySelectorAll('.btn-del').forEach(btn =>
     btn.addEventListener('click', () => adminDeleteEntry(parseInt(btn.dataset.idx))));
+
+  if (filtered.length > visibleCount) {
+    const remaining = filtered.length - visibleCount;
+    const moreBtn = document.createElement('button');
+    moreBtn.className = 'admin-list-more-btn';
+    moreBtn.textContent = `Voir ${remaining} de plus`;
+    moreBtn.addEventListener('click', () => adminRenderList(visibleCount + ADMIN_PAGE_SIZE));
+    list.appendChild(moreBtn);
+  }
 }
 
 // ── Delete ────────────────────────────────────────────────────
@@ -1874,24 +2304,30 @@ function openAdminModal(idx = null) {
   document.getElementById('modal-title-label').textContent = idx === null ? 'Ajouter' : 'Éditer';
   document.getElementById('form-submit').textContent       = idx === null ? 'Ajouter' : 'Mettre à jour';
 
+  const fieldsWrap = document.getElementById('form-fields-wrap');
+  const submitBtn  = document.getElementById('form-submit');
+
   if (idx !== null) {
+    fieldsWrap.classList.remove('hidden');
+    submitBtn.disabled = false;
     const item = adminData[adminTab][idx];
-    document.getElementById('f-title').value   = item.title   || '';
-    document.getElementById('f-year').value    = item.year    || '';
-    document.getElementById('f-genre').value   = (item.genre  || []).join(', ');
-    document.getElementById('f-poster').value  = item.poster  || '';
+    document.getElementById('f-title').value    = item.title    || '';
+    document.getElementById('f-year').value     = item.year     || '';
+    document.getElementById('f-genre').value    = (item.genre   || []).join(', ');
+    document.getElementById('f-poster').value   = item.poster   || '';
+    document.getElementById('f-backdrop').value = item.backdrop || '';
     adminUpdatePosterPreview(item.poster);
     if (isFilm) {
       document.getElementById('f-director').value = item.director || '';
       document.getElementById('f-cast').value     = (item.cast || []).join(', ');
       document.getElementById('f-time').value     = item.time || '';
-    } else {
     }
   } else {
+    fieldsWrap.classList.add('hidden');
+    submitBtn.disabled = true;
     document.getElementById('entry-form').reset();
     document.getElementById('tmdb-results').innerHTML = '';
     document.getElementById('tmdb-query').value       = '';
-    document.getElementById('poster-preview').classList.add('hidden');
   }
 
   document.getElementById('entry-modal').classList.remove('hidden');
@@ -1928,12 +2364,14 @@ document.getElementById('entry-form').addEventListener('submit', e => {
   e.preventDefault();
   const isFilm = adminTab === 'films' || adminTab === 'watchlist';
 
+  const backdropVal = document.getElementById('f-backdrop').value.trim();
   const entry = {
-    title:  document.getElementById('f-title').value.trim(),
-    genre:  document.getElementById('f-genre').value.split(',').map(g => g.trim()).filter(Boolean),
-    poster: document.getElementById('f-poster').value.trim(),
-    url:    '#',
-    year:   parseInt(document.getElementById('f-year').value) || null,
+    title:    document.getElementById('f-title').value.trim(),
+    genre:    document.getElementById('f-genre').value.split(',').map(g => g.trim()).filter(Boolean),
+    poster:   document.getElementById('f-poster').value.trim(),
+    url:      '#',
+    year:     parseInt(document.getElementById('f-year').value) || null,
+    ...(backdropVal ? { backdrop: backdropVal } : {}),
   };
 
   if (isFilm) {
@@ -1959,6 +2397,12 @@ document.getElementById('entry-form').addEventListener('submit', e => {
 
   closeAdminModal();
   adminRenderList();
+
+  if (_quickAddMode) {
+    _quickAddMode = false;
+    document.getElementById('admin-panel').classList.add('hidden');
+    adminSaveData().then(() => loadUserData(currentUser.uid));
+  }
 });
 
 // ── Poster preview ────────────────────────────────────────────
@@ -2062,9 +2506,22 @@ async function adminTmdbAutoFill(id, type) {
     }
 
     const genres = (details.genres || []).slice(0, 2).map(g => adminTranslateGenre(g.name));
-    document.getElementById('f-genre').value = genres.join(', ');
+    document.getElementById('f-genre').value    = genres.join(', ');
+    document.getElementById('f-backdrop').value = details.backdrop_path ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}` : '';
     adminUpdatePosterPreview(document.getElementById('f-poster').value);
-    resultsEl.innerHTML = '<p class="tmdb-msg tmdb-success">✓ Données importées — vérifie et complète les champs.</p>';
+    const _poster = document.getElementById('f-poster').value;
+    const _title  = document.getElementById('f-title').value;
+    const _year   = document.getElementById('f-year').value;
+    resultsEl.innerHTML = `
+      <div class="tmdb-selection-card">
+        ${_poster ? `<img class="tmdb-selection-poster" src="${_poster}" alt="" />` : ''}
+        <div class="tmdb-selection-info">
+          <p class="tmdb-selection-title">${_title}</p>
+          ${_year ? `<p class="tmdb-selection-year">${_year}</p>` : ''}
+          <p class="tmdb-msg tmdb-success" style="margin-top:6px">✓ Prêt à ajouter</p>
+        </div>
+      </div>`;
+    document.getElementById('form-submit').disabled = false;
   } catch(e) {
     resultsEl.innerHTML = '<p class="tmdb-msg">Erreur lors du chargement.</p>';
   }
@@ -2080,4 +2537,147 @@ const ADMIN_GENRE_MAP = {
   'Kids':'Jeunesse','Reality':'Réalité','War & Politics':'Politique',
 };
 function adminTranslateGenre(name) { return ADMIN_GENRE_MAP[name] || name; }
+
+// ── Import CSV ────────────────────────────────────────────────
+function parseCsv(text) {
+  const lines = text.trim().split('\n');
+  const header = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+  return lines.slice(1).map(line => {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    cols.push(cur.trim());
+    const row = {};
+    header.forEach((h, i) => row[h] = cols[i] || '');
+    return row;
+  }).filter(r => r.Title);
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+document.getElementById('admin-import-csv-btn').addEventListener('click', () => {
+  document.getElementById('admin-csv-input').click();
+});
+
+document.getElementById('admin-csv-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file || !currentUser) return;
+  e.target.value = '';
+  const text = await file.text();
+  const rows = parseCsv(text);
+  if (!rows.length) return;
+  await runCsvImport(rows);
+});
+
+async function runCsvImport(rows) {
+  const overlay    = document.getElementById('import-overlay');
+  const barEl      = document.getElementById('import-progress-bar');
+  const statusEl   = document.getElementById('import-status');
+  const currentEl  = document.getElementById('import-current');
+  const logEl      = document.getElementById('import-log');
+  const doneBtn    = document.getElementById('import-done-btn');
+
+  overlay.classList.remove('hidden');
+  logEl.innerHTML = '';
+  doneBtn.classList.add('hidden');
+
+  const imported = [];
+  const errors   = [];
+  const total    = rows.length;
+
+  function logLine(msg, type = '') {
+    const p = document.createElement('p');
+    p.className = type ? `import-log-${type}` : '';
+    p.textContent = msg;
+    logEl.appendChild(p);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  for (let i = 0; i < total; i++) {
+    const row = rows[i];
+    const title  = row['Title']     || '';
+    const year   = row['Year']      || '';
+    const director = row['Directors'] || '';
+    const rating = parseInt(row['Rating10']) || null;
+
+    barEl.style.width = `${Math.round((i / total) * 100)}%`;
+    statusEl.textContent = `${i + 1} / ${total} films traités`;
+    currentEl.textContent = title;
+
+    try {
+      // Search TMDB
+      const searchRes = await adminTmdbFetch(
+        `/search/movie?query=${encodeURIComponent(title)}&year=${year}&include_adult=false`
+      );
+      await delay(150);
+
+      const match = (searchRes.results || []).find(r =>
+        r.release_date?.startsWith(year)
+      ) || searchRes.results?.[0];
+
+      if (!match) {
+        logLine(`✕ Non trouvé : ${title} (${year})`, 'err');
+        errors.push(title);
+        continue;
+      }
+
+      // Fetch full details with credits
+      const details = await adminTmdbFetch(`/movie/${match.id}?append_to_response=credits`);
+      await delay(150);
+
+      const h = Math.floor((details.runtime || 0) / 60);
+      const m = (details.runtime || 0) % 60;
+      const timeStr = details.runtime ? (m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`) : '';
+      const genres  = (details.genres || []).slice(0, 2).map(g => adminTranslateGenre(g.name));
+      const cast     = (details.credits?.cast || []).slice(0, 8).map(c => c.name);
+      const poster   = details.poster_path   ? TMDB_IMG + details.poster_path : '';
+      const backdrop = details.backdrop_path ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}` : '';
+
+      const entry = {
+        title:    details.title || title,
+        year:     parseInt(details.release_date?.slice(0, 4) || year) || null,
+        genre:    genres,
+        poster,
+        ...(backdrop ? { backdrop } : {}),
+        url:      '#',
+        director: director || (details.credits?.crew?.find(c => c.job === 'Director')?.name || ''),
+        cast,
+        time:     timeStr,
+      };
+      if (rating) entry.stars = rating;
+
+      imported.push(entry);
+      logLine(`✓ ${entry.title} (${entry.year})`, 'ok');
+
+    } catch(err) {
+      logLine(`✕ Erreur : ${title} — ${err.message}`, 'err');
+      errors.push(title);
+    }
+  }
+
+  // Save to Firebase
+  barEl.style.width = '100%';
+  statusEl.textContent = 'Sauvegarde dans Firebase…';
+  currentEl.textContent = '';
+  try {
+    if (!adminDataLoaded) await adminLoadData(currentUser.uid);
+    adminData.films = imported;
+    await adminSaveData();
+    await loadUserData(currentUser.uid);
+    statusEl.textContent = `✓ Import terminé — ${imported.length} films importés, ${errors.length} erreurs.`;
+  } catch(err) {
+    statusEl.textContent = `Erreur de sauvegarde : ${err.message}`;
+  }
+
+  doneBtn.classList.remove('hidden');
+}
+
+document.getElementById('import-done-btn').addEventListener('click', () => {
+  document.getElementById('import-overlay').classList.add('hidden');
+});
 

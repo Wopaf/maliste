@@ -41,37 +41,40 @@
         <div class="home-cover-gradient"></div>
       </div>
       <div class="home-profile-bar">
-        <button class="home-user-btn" id="home-user-btn">
-          <img class="home-user-avatar" id="home-user-avatar" style="display:none" alt="" />
-          <span class="home-user-initials" id="home-user-initials"></span>
-        </button>
-        <div class="home-profile-info">
-          <p class="home-app-title" id="home-app-title"></p>
-          <div class="home-profile-stats" id="home-profile-stats"></div>
+        <div class="home-profile-left">
+          <button class="home-user-btn" id="home-user-btn">
+            <img class="home-user-avatar" id="home-user-avatar" style="display:none" alt="" />
+            <span class="home-user-initials" id="home-user-initials"></span>
+          </button>
+          <div class="home-app-title-wrap">
+            <p class="home-app-title" id="home-app-title"></p>
+            <p class="home-app-email" id="home-app-email"></p>
+          </div>
         </div>
+        <div class="home-profile-stats" id="home-profile-stats"></div>
       </div>
     </header>
     <div class="home-content">
-      <section class="home-carousel">
-        <div class="home-carousel-hdr">
-          <h2 class="home-carousel-title" id="home-strip-films-title">Mes Films</h2>
-        </div>
-        <div class="home-strip" id="home-strip-films"></div>
-      </section>
-      <hr class="home-divider">
-      <section class="home-carousel">
-        <div class="home-carousel-hdr">
-          <h2 class="home-carousel-title" id="home-strip-series-title">Mes Séries</h2>
-        </div>
-        <div class="home-strip" id="home-strip-series"></div>
-      </section>
-      <hr class="home-divider">
       <section class="home-carousel" id="home-section-watchlist">
         <div class="home-carousel-hdr">
-          <h2 class="home-carousel-title" id="home-strip-watchlist-title">À voir</h2>
+          <h2 class="home-carousel-title" id="home-strip-watchlist-title">Ma Watchlist</h2>
         </div>
         <div class="home-strip" id="home-strip-watchlist"></div>
       </section>
+      <div class="home-row">
+        <section class="home-carousel">
+          <div class="home-carousel-hdr">
+            <h2 class="home-carousel-title" id="home-strip-films-title">Mes Films</h2>
+          </div>
+          <div class="home-strip" id="home-strip-films"></div>
+        </section>
+        <section class="home-carousel">
+          <div class="home-carousel-hdr">
+            <h2 class="home-carousel-title" id="home-strip-series-title">Mes Séries</h2>
+          </div>
+          <div class="home-strip" id="home-strip-series"></div>
+        </section>
+      </div>
       <hr class="home-divider">
       <section class="home-carousel" id="home-section-community">
         <div class="home-carousel-hdr">
@@ -113,20 +116,6 @@
       </button>
     </div>
     <div class="f-bar">
-      <nav class="tabs">
-        <button class="tab active" data-tab="films">
-          <span class="tab-label">Films</span>
-          <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="m160-800 65 130q7 14 20 22t28 8q30 0 46-25.5t2-52.5l-41-82h80l65 130q7 14 20 22t28 8q30 0 46-25.5t2-52.5l-41-82h80l65 130q7 14 20 22t28 8q30 0 46-25.5t2-52.5l-41-82h120q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Zm0 240v320h640v-320H160Zm0 0v320-320Z"/></svg></span>
-        </button>
-        <button class="tab" data-tab="series">
-          <span class="tab-label">Séries</span>
-          <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="M400-200v-80H160q-33 0-56.5-23.5T80-360v-400q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v400q0 33-23.5 56.5T800-280H560v80h40q17 0 28.5 11.5T640-160q0 17-11.5 28.5T600-120H360q-17 0-28.5-11.5T320-160q0-17 11.5-28.5T360-200h40ZM160-360h640v-400H160v400Zm0 0v-400 400Z"/></svg></span>
-        </button>
-        <button class="tab" data-tab="watchlist">
-          <span class="tab-label">À voir</span>
-          <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm80-80h400v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Z"/></svg></span>
-        </button>
-      </nav>
       <button class="f-bar-toggle" id="f-bar-toggle">
         <svg class="icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         <svg class="icon-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,18 9,12 15,6"/></svg>
@@ -156,16 +145,8 @@
         <ul class="dropdown-list"></ul>
       </div>
       </div>
-      <button class="compact-btn" id="compact-fbar-btn" title="Vue compacte">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-          <rect x="3" y="3" width="7" height="4" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/>
-          <rect x="3" y="10" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="4" rx="1"/>
-          <rect x="3" y="17" width="7" height="4" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/>
-        </svg>
-      </button>
     </div>
-    <!-- Bouton utilisateur -->
-    <div class="user-area" id="user-area">
+    <div class="user-area" id="user-area" style="display:none">
       <button class="user-btn" id="user-btn">
         <img class="user-btn-avatar" id="user-btn-avatar" style="display:none" alt="" />
         <span class="user-initials" id="user-initials"></span>
@@ -173,51 +154,76 @@
     </div>
     </div>
   </header>
-  <div class="grid-info">
-    <span id="result-count" class="badge"></span>
-    <span id="time-count" class="badge"></span>
-  </div>
   </div><!-- /.sticky-top -->
 
-  <section class="rec-section">
-    <h2 class="rec-section-title">Dernier coup de cœur</h2>
-    <div id="rec-card-wrap"></div>
-  </section>
 
-  <section class="top-section" id="top-section">
-    <button class="top-col" id="top-section-real-btn">
-      <h3 class="top-col-title"><span class="top-col-title-long">Top Réalisateurs</span><span class="top-col-title-short">Top Réal.</span></h3>
-      <svg class="top-col-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="9,18 15,12 9,6"/></svg>
-    </button>
-    <button class="top-col" id="top-section-cast-btn">
-      <h3 class="top-col-title">Top Acteurs</h3>
-      <svg class="top-col-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="9,18 15,12 9,6"/></svg>
-    </button>
-  </section>
 
-  <div id="person-badge-wrap" class="person-badge-wrap"></div>
-
-  <main id="grid" class="grid"></main>
+  <div class="app-body">
+    <div class="app-main-col">
+      <main id="grid" class="grid"></main>
+      <div id="load-more-wrap" class="load-more-wrap" style="display:none"></div>
+    </div>
+    <aside class="stats-sidebar" id="stats-sidebar">
+      <section class="sidebar-section" id="sidebar-person-section" style="display:none">
+        <h3 class="sidebar-title">Personnes</h3>
+        <div id="sidebar-person-badges"></div>
+      </section>
+      <div class="sidebar-btn-group">
+        <button class="sidebar-edit-btn" id="sidebar-edit-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 0 24 24" width="14px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M3 17.46v3.04c0 .28.22.5.5.5h3.04c.13 0 .26-.05.35-.15L17.81 9.94l-3.75-3.75L3.15 17.1c-.1.1-.15.22-.15.36zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          Éditer la liste
+        </button>
+        <button class="sidebar-edit-btn" id="export-letterboxd-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
+          Exporter .csv
+        </button>
+      </div>
+      <section class="sidebar-section sidebar-display-prefs">
+        <h3 class="sidebar-title">Affichage</h3>
+        <label class="sidebar-pref-item">
+          <input type="checkbox" id="pref-titles" /> Titres
+        </label>
+        <label class="sidebar-pref-item">
+          <input type="checkbox" id="pref-dates" /> Dates
+        </label>
+        <label class="sidebar-pref-item">
+          <input type="checkbox" id="pref-ratings" /> Notes
+        </label>
+        <label class="sidebar-pref-item">
+          <input type="checkbox" id="pref-compact" /> Vue compacte
+        </label>
+      </section>
+      <section class="sidebar-section sidebar-counts" id="sidebar-counts-section">
+        <h3 class="sidebar-title">Stats</h3>
+        <span id="result-count" class="sidebar-count-badge"></span>
+        <span id="time-count" class="sidebar-count-badge"></span>
+      </section>
+      <section class="sidebar-section" id="sidebar-section-ratings">
+        <div id="sidebar-ratings"></div>
+      </section>
+      <section class="sidebar-section" id="sidebar-section-directors">
+        <h3 class="sidebar-title">Top Réalisateurs</h3>
+        <ul class="sidebar-list" id="sidebar-directors"></ul>
+        <button class="sidebar-more-btn" id="sidebar-directors-more">Voir plus</button>
+      </section>
+      <section class="sidebar-section" id="sidebar-section-actors">
+        <h3 class="sidebar-title">Top Acteurs</h3>
+        <ul class="sidebar-list" id="sidebar-actors"></ul>
+        <button class="sidebar-more-btn" id="sidebar-actors-more">Voir plus</button>
+      </section>
+    </aside>
+  </div>
 
   </div><!-- /#main-app -->
 
   <!-- Menu profil global (fixed, accessible depuis toutes les pages) -->
+  <!-- Éléments fantômes user-menu (référencés par le JS) -->
+  <span id="user-menu-email" style="display:none"></span>
+  <span id="user-pseudo-display" style="display:none"></span>
+  <img id="user-menu-avatar-img" style="display:none" alt="" />
+  <span id="user-menu-avatar-initial" style="display:none"></span>
+
   <div class="user-menu" id="user-menu">
-      <div class="user-menu-header">
-        <div class="user-menu-profile-top">
-          <div class="user-menu-avatar-btn" id="user-menu-avatar-btn">
-            <img class="user-menu-avatar-img" id="user-menu-avatar-img" style="display:none" alt="" />
-            <span class="user-menu-avatar-initial" id="user-menu-avatar-initial"></span>
-          </div>
-          <div class="user-menu-profile-info">
-            <div class="user-pseudo-row" id="user-pseudo-row">
-              <span class="user-pseudo-text" id="user-pseudo-display"></span>
-            </div>
-            <span class="user-menu-email" id="user-menu-email"></span>
-          </div>
-        </div>
-      </div>
-      <a class="user-menu-edit" href="#" id="edit-lists-link">Éditer mes listes</a>
       <button class="user-menu-item" id="edit-profile-btn">Editer mon Profil</button>
       <div class="user-menu-separator"></div>
       <button class="user-menu-logout" id="logout-btn">Se déconnecter</button>
@@ -225,44 +231,59 @@
 
   <div id="modal-backdrop" class="modal-backdrop"></div>
   <div class="modal-card" id="modal-card">
-    <button class="modal-close" id="modal-close">✕</button>
+
+    <!-- Fond plein écran -->
     <div class="modal-poster-header" id="modal-poster-header">
       <img class="modal-poster-img" id="modal-poster-img" alt="">
+      <div class="modal-bg-gradient"></div>
     </div>
-    <div class="modal-info">
-      <div class="modal-meta">
-        <p class="modal-title" id="modal-title"></p>
-        <div class="modal-year-row">
-          <p class="modal-year" id="modal-year"></p>
+
+    <button class="modal-close" id="modal-close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+
+    <!-- Contenu centré en bas -->
+    <div class="modal-content">
+      <!-- Affiche -->
+      <img class="modal-film-poster" id="modal-film-poster" alt="">
+
+      <!-- Infos -->
+      <div class="modal-info">
+        <div class="modal-meta">
+          <p class="modal-title" id="modal-title"></p>
+          <div class="modal-year-row">
+            <p class="modal-year" id="modal-year"></p>
+          </div>
+          <p class="modal-director" id="modal-director"></p>
+          <p class="modal-cast" id="modal-cast"></p>
+          <p class="modal-series-info" id="modal-series-info"></p>
         </div>
-        <hr class="modal-divider">
-        <p class="modal-director" id="modal-director"></p>
-        <p class="modal-cast" id="modal-cast"></p>
-        <p class="modal-series-info" id="modal-series-info"></p>
-      </div>
-      <div class="modal-actions">
-        <a class="modal-link" id="modal-link" target="_blank" rel="noopener noreferrer">Informations</a>
-        <a class="modal-link modal-link-secondary" id="modal-trailer" target="_blank" rel="noopener noreferrer">Bande annonce</a>
-      </div>
-      <div class="modal-stars" id="modal-stars">
-        <span class="star" data-value="1"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-        <span class="star" data-value="2"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-        <span class="star" data-value="3"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-        <span class="star" data-value="4"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-        <span class="star" data-value="5"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-        <span class="star" data-value="6"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-        <span class="star" data-value="7"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-        <span class="star" data-value="8"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-        <span class="star" data-value="9"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-        <span class="star" data-value="10"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
-      </div>
-      <p class="modal-rating-label" id="modal-rating-label"></p>
-      <div class="modal-bottom-actions">
-        <button class="modal-recommend-btn" id="modal-recommend-btn">❤ Mettre en recommandation</button>
-        <button class="modal-copy-btn hidden" id="modal-copy-btn">Copier dans ma liste</button>
-        <div class="modal-transfer-actions hidden" id="modal-transfer-actions">
-          <button class="modal-transfer-btn" id="modal-transfer-films">→ Transférer vers mes Films</button>
-          <button class="modal-transfer-btn" id="modal-transfer-series">→ Transférer vers mes Séries</button>
+
+        <div class="modal-stars" id="modal-stars">
+          <span class="star" data-value="1"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          <span class="star" data-value="2"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          <span class="star" data-value="3"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          <span class="star" data-value="4"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          <span class="star" data-value="5"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          <span class="star" data-value="6"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          <span class="star" data-value="7"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          <span class="star" data-value="8"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          <span class="star" data-value="9"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          <span class="star" data-value="10"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+        </div>
+        <p class="modal-rating-label" id="modal-rating-label"></p>
+
+        <div class="modal-actions">
+          <a class="modal-link" id="modal-link" target="_blank" rel="noopener noreferrer">Informations</a>
+          <a class="modal-link modal-link-secondary" id="modal-trailer" target="_blank" rel="noopener noreferrer">Bande annonce</a>
+        </div>
+
+        <div class="modal-bottom-actions">
+          <button class="modal-copy-btn hidden" id="modal-copy-btn">Copier dans ma liste</button>
+          <div class="modal-transfer-actions hidden" id="modal-transfer-actions">
+            <button class="modal-transfer-btn" id="modal-transfer-films"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM235.5-272Q125-344 61-462q-5-9-7.5-18.5T51-500q0-10 2.5-19.5T61-538q64-118 174.5-190T480-800q134 0 244.5 72T899-538q5 9 7.5 18.5T909-500q0 10-2.5 19.5T899-462q-64 118-174.5 190T480-200q-134 0-244.5-72ZM480-500Zm207.5 160.5Q782-399 832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280q113 0 207.5-59.5Z"/></svg> Marquer ce Film comme vu</button>
+            <button class="modal-transfer-btn" id="modal-transfer-series"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM235.5-272Q125-344 61-462q-5-9-7.5-18.5T51-500q0-10 2.5-19.5T61-538q64-118 174.5-190T480-800q134 0 244.5 72T899-538q5 9 7.5 18.5T909-500q0 10-2.5 19.5T899-462q-64 118-174.5 190T480-200q-134 0-244.5-72ZM480-500Zm207.5 160.5Q782-399 832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280q113 0 207.5-59.5Z"/></svg> Marquer cette Série comme vue</button>
+          </div>
         </div>
       </div>
     </div>
@@ -281,56 +302,67 @@
   <!-- ── Side menu mobile ── -->
   <div id="side-menu" class="side-menu">
     <div class="side-menu-inner">
-      <div class="side-menu-header">
-        <span class="side-menu-logo">Navigation</span>
-        <button class="side-menu-close-btn" id="side-menu-close">✕</button>
+      <button class="side-menu-close-btn hidden" id="side-menu-close" style="display:none"></button>
+      <!-- Éléments fantômes pour compatibilité JS -->
+      <button class="side-action-btn hidden" id="compact-side-btn"></button>
+      <div id="side-tabs" style="display:none"></div>
+      <div id="side-menu-stats" style="display:none"></div>
+      <div id="side-nav-home" style="display:none"></div>
+      <div id="side-nav-community" style="display:none"></div>
+      <!-- Header fixe -->
+      <div class="sm-sidebar-header">
+        <h2 class="sm-sidebar-title">Menu</h2>
       </div>
-      <div class="side-menu-body">
-        <div class="side-section">
-          <p class="side-section-title">Catégorie</p>
-          <div id="side-tabs"></div>
-        </div>
-        <div class="side-section side-collapsible collapsed" id="side-sort-section">
-          <button class="side-collapsible-header">
-            <span class="side-section-title" style="margin-bottom:0">Tri</span>
-            <svg class="side-collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg>
+      <!-- Contenu scrollable du sidebar -->
+      <div class="sm-sidebar-content">
+        <div class="sidebar-btn-group">
+          <button class="sidebar-edit-btn" id="sm-sidebar-edit-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 0 24 24" width="14px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M3 17.46v3.04c0 .28.22.5.5.5h3.04c.13 0 .26-.05.35-.15L17.81 9.94l-3.75-3.75L3.15 17.1c-.1.1-.15.22-.15.36zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            Éditer la liste
           </button>
-          <div class="side-collapsible-body" id="side-sort-list"></div>
-        </div>
-        <div class="side-section side-collapsible collapsed" id="side-genre-section">
-          <button class="side-collapsible-header">
-            <span class="side-section-title" style="margin-bottom:0">Filtrer</span>
-            <svg class="side-collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-          <div class="side-collapsible-body" id="side-genre-list"></div>
-        </div>
-        <div class="side-section">
-          <p class="side-section-title">Affichage</p>
-          <button class="side-action-btn" id="compact-side-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-              <rect x="3" y="3" width="7" height="4" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/>
-              <rect x="3" y="10" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="4" rx="1"/>
-              <rect x="3" y="17" width="7" height="4" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/>
-            </svg>
-            Vue compacte
+          <button class="sidebar-edit-btn" id="sm-export-letterboxd-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
+            Exporter .csv
           </button>
         </div>
+        <section class="sidebar-section">
+          <h3 class="sidebar-title">Trier</h3>
+          <div id="side-sort-list"></div>
+        </section>
+        <section class="sidebar-section">
+          <h3 class="sidebar-title">Filtrer par genre</h3>
+          <div id="side-genre-list" class="side-genre-list"></div>
+        </section>
+        <section class="sidebar-section" id="sm-sidebar-person-section" style="display:none">
+          <h3 class="sidebar-title">Personnes</h3>
+          <div id="sm-sidebar-person-badges"></div>
+        </section>
+        <section class="sidebar-section sidebar-display-prefs">
+          <h3 class="sidebar-title">Affichage</h3>
+          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-titles" /> Titres</label>
+          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-dates" /> Dates</label>
+          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-ratings" /> Notes</label>
+          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-compact" /> Vue compacte</label>
+        </section>
+        <section class="sidebar-section" id="sm-sidebar-section-directors">
+          <h3 class="sidebar-title">Top Réalisateurs</h3>
+          <ul class="sidebar-list" id="sm-sidebar-directors"></ul>
+          <button class="sidebar-more-btn" id="sm-sidebar-directors-more">Voir plus</button>
+        </section>
+        <section class="sidebar-section" id="sm-sidebar-section-actors">
+          <h3 class="sidebar-title">Top Acteurs</h3>
+          <ul class="sidebar-list" id="sm-sidebar-actors"></ul>
+          <button class="sidebar-more-btn" id="sm-sidebar-actors-more">Voir plus</button>
+        </section>
+        <section class="sidebar-section sidebar-counts">
+          <h3 class="sidebar-title">Stats</h3>
+          <span id="sm-result-count" class="sidebar-count-badge"></span>
+          <span id="sm-time-count" class="sidebar-count-badge"></span>
+        </section>
+        <section class="sidebar-section" id="sm-sidebar-section-ratings">
+          <div id="sm-sidebar-ratings"></div>
+        </section>
       </div>
-      <div class="side-menu-nav">
-        <button class="side-action-btn" id="side-nav-home">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-            <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><polyline points="9,22 9,12 15,12 15,22"/>
-          </svg>
-          Page d'accueil
-        </button>
-        <button class="side-action-btn" id="side-nav-community">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-            <circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M1 21v-2a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v2"/><path d="M17 11a4 4 0 0 1 4 4v2"/>
-          </svg>
-          Communauté
-        </button>
-      </div>
-      <div class="side-menu-stats" id="side-menu-stats"></div>
     </div>
   </div>
   <div id="side-menu-backdrop" class="side-menu-backdrop"></div>
@@ -346,16 +378,31 @@
   <!-- ── Modal édition profil ── -->
   <div id="edit-profile-modal" class="edit-profile-modal">
     <div class="edit-profile-inner">
-      <div class="edit-profile-header">
-        <p class="edit-profile-title">Mon Profil</p>
-        <button class="edit-profile-close" id="edit-profile-close">✕</button>
-      </div>
-      <div class="edit-profile-body">
-        <div class="ep-avatar-section">
-          <div class="ep-avatar-preview" id="ep-avatar-preview"></div>
-          <button class="ep-change-avatar-btn" id="ep-change-avatar-btn">Changer l'image</button>
-          <div class="ep-avatar-picker hidden" id="ep-avatar-picker"></div>
+
+      <!-- Aperçu visuel cliquable -->
+      <div class="ep-preview">
+        <div class="ep-cover-zone" id="ep-cover-zone">
+          <img class="ep-cover-img" id="ep-cover-img" src="" alt="" />
+          <div class="ep-cover-overlay">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Changer la couverture
+          </div>
         </div>
+        <div class="ep-preview-bar">
+          <div class="ep-avatar-wrap">
+            <div class="ep-avatar-preview" id="ep-avatar-preview"></div>
+            <button class="ep-avatar-edit-icon" id="ep-change-avatar-btn" title="Changer l'avatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11" height="11"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </button>
+          </div>
+          <button class="edit-profile-close" id="edit-profile-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Champs -->
+      <div class="edit-profile-body">
         <div class="ep-field">
           <label class="ep-label">Pseudo</label>
           <input type="text" class="ep-input" id="ep-name-input" maxlength="30" autocomplete="off" />
@@ -369,9 +416,28 @@
           <div class="ep-color-swatches" id="ep-color-swatches"></div>
         </div>
       </div>
+
       <div class="edit-profile-footer">
         <button class="ep-cancel-btn" id="ep-cancel-btn">Annuler</button>
         <button class="ep-save-btn" id="ep-save-btn">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal sélection image (avatar / couverture) ── -->
+  <div class="img-picker-modal hidden" id="img-picker-modal">
+    <div class="img-picker-box">
+      <div class="img-picker-header">
+        <p class="img-picker-title" id="img-picker-title">Choisir une image</p>
+        <button class="img-picker-close" id="img-picker-close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <input type="text" class="ep-input img-picker-search" id="img-picker-search" placeholder="Rechercher…" autocomplete="off" />
+      <div class="img-picker-grid" id="img-picker-grid"></div>
+      <div class="img-picker-footer">
+        <button class="ep-cancel-btn" id="img-picker-cancel">Annuler</button>
+        <button class="ep-save-btn" id="img-picker-confirm">Valider</button>
       </div>
     </div>
   </div>
@@ -394,30 +460,14 @@
   <!-- ── Panneau admin (overlay plein écran) ── -->
   <div id="admin-panel" class="hidden">
 
+  <div class="admin-header-group">
     <header class="admin-header">
+      
       <button class="btn-back" id="admin-back-btn" title="Retour">
         <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="m142-480 294 294q15 15 14.5 35T435-116q-15 15-35 15t-35-15L57-423q-12-12-18-27t-6-30q0-15 6-30t18-27l308-308q15-15 35.5-14.5T436-844q15 15 15 35t-15 35L142-480Z"/></svg>
         <span class="btn-back-label">Retour</span>
       </button>
-      <div class="header-actions">
-        <button class="btn-ghost" id="admin-add-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M440-440H240q-17 0-28.5-11.5T200-480q0-17 11.5-28.5T240-520h200v-200q0-17 11.5-28.5T480-760q17 0 28.5 11.5T520-720v200h200q17 0 28.5 11.5T760-480q0 17-11.5 28.5T720-440H520v200q0 17-11.5 28.5T480-200q-17 0-28.5-11.5T440-240v-200Z"/></svg>
-          Ajouter
-        </button>
-        <button class="btn-primary" id="admin-save-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h447q16 0 30.5 6t25.5 17l114 114q11 11 17 25.5t6 30.5v447q0 33-23.5 56.5T760-120H200Zm560-526L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM280-560h280q17 0 28.5-11.5T600-600v-80q0-17-11.5-28.5T560-720H280q-17 0-28.5 11.5T240-680v80q0 17 11.5 28.5T280-560Zm-80-86v446-560 114Z"/></svg>
-          <span id="admin-save-label">Sauvegarder</span>
-        </button>
-      </div>
-    </header>
-
-    <div class="tab-bar">
-      <nav class="admin-tabs">
-        <button class="a-tab active" data-tab="films">Films</button>
-        <button class="a-tab" data-tab="series">Séries</button>
-        <button class="a-tab" data-tab="watchlist">À voir</button>
-      </nav>
-      <div class="filter-bar">
+      <div class="admin-search-wrap">
         <div class="search-bar" id="admin-search-bar">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -430,7 +480,22 @@
           </button>
         </div>
       </div>
-    </div>
+      <div class="header-actions">
+        <button class="btn-ghost" id="admin-import-csv-btn" style="display:none">
+          Importer CSV
+        </button>
+        <input type="file" id="admin-csv-input" accept=".csv" style="display:none" />
+        <button class="btn-ghost" id="admin-add-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M440-440H240q-17 0-28.5-11.5T200-480q0-17 11.5-28.5T240-520h200v-200q0-17 11.5-28.5T480-760q17 0 28.5 11.5T520-720v200h200q17 0 28.5 11.5T760-480q0 17-11.5 28.5T720-440H520v200q0 17-11.5 28.5T480-200q-17 0-28.5-11.5T440-240v-200Z"/></svg>
+          Ajouter
+        </button>
+        <button class="btn-primary" id="admin-save-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h447q16 0 30.5 6t25.5 17l114 114q11 11 17 25.5t6 30.5v447q0 33-23.5 56.5T760-120H200Zm560-526L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM280-560h280q17 0 28.5-11.5T600-600v-80q0-17-11.5-28.5T560-720H280q-17 0-28.5 11.5T240-680v80q0 17 11.5 28.5T280-560Zm-80-86v446-560 114Z"/></svg>
+          <span id="admin-save-label">Sauvegarder</span>
+        </button>
+      </div>
+    </header>
+  </div>
 
     <p id="admin-count-label" style="font-size:12px;color:#444;padding:10px 24px 0;"></p>
     <div class="entry-list" id="entry-list"></div>
@@ -447,30 +512,33 @@
       </div>
     </div>
 
-    <!-- Ajout / édition -->
-    <div class="admin-modal hidden" id="entry-modal">
-      <div class="modal-box">
-        <div class="modal-header">
-          <h2 id="modal-title-label">Ajouter</h2>
-          <button class="modal-close-btn" id="admin-modal-close-btn">✕</button>
-        </div>
-        <div class="modal-body">
+  </div>
 
-          <div id="tmdb-section">
-            <div class="tmdb-bar">
-              <input type="text" id="tmdb-query" placeholder="Rechercher sur TMDB…" />
-              <button class="btn-ghost" id="tmdb-search-btn">Rechercher</button>
-            </div>
-            <div id="tmdb-results"></div>
-            <hr class="tmdb-divider" />
+  <!-- Ajout / édition (indépendant du panneau admin) -->
+  <div class="admin-modal hidden" id="entry-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modal-title-label">Ajouter</h2>
+        <button class="modal-close-btn" id="admin-modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <div id="tmdb-section">
+          <div class="tmdb-bar">
+            <input type="text" id="tmdb-query" placeholder="Rechercher sur TMDB…" />
+            <button class="btn-ghost" id="tmdb-search-btn">Rechercher</button>
           </div>
+          <div id="tmdb-results"></div>
+          <hr class="tmdb-divider" />
+        </div>
 
-          <form id="entry-form" autocomplete="off">
-            <div style="display:flex;flex-direction:column;gap:12px;">
+        <form id="entry-form" autocomplete="off">
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div id="form-fields-wrap">
               <div class="form-row">
                 <div class="form-field">
                   <label>Titre *</label>
-                  <input type="text" id="f-title" required />
+                  <input type="text" id="f-title" />
                 </div>
                 <div class="form-field">
                   <label>Année</label>
@@ -487,6 +555,10 @@
                   <input type="text" id="f-poster" placeholder="https://image.tmdb.org/…" />
                   <img id="poster-preview" class="poster-preview hidden" alt="" />
                 </div>
+              </div>
+              <div class="form-field">
+                <label>Image de fond <span style="color:#444;font-weight:400;text-transform:none">(backdrop, optionnel)</span></label>
+                <input type="text" id="f-backdrop" placeholder="https://image.tmdb.org/…" />
               </div>
               <div id="film-fields">
                 <div style="display:flex;flex-direction:column;gap:12px;">
@@ -507,18 +579,31 @@
                 </div>
               </div>
               <div id="series-fields" class="hidden"></div>
-              <p id="entry-dup-error" class="hidden" style="color:#e05555;font-size:12px;background:rgba(224,85,85,0.08);border:1px solid rgba(224,85,85,0.2);border-radius:8px;padding:8px 12px;">Ce titre est déjà présent dans la liste.</p>
-              <div class="form-actions">
-                <button type="button" class="btn-ghost" id="form-cancel">Annuler</button>
-                <button type="submit" class="btn-primary" id="form-submit">Ajouter</button>
-              </div>
             </div>
-          </form>
+            <p id="entry-dup-error" class="hidden" style="color:#e05555;font-size:12px;background:rgba(224,85,85,0.08);border:1px solid rgba(224,85,85,0.2);border-radius:8px;padding:8px 12px;">Ce titre est déjà présent dans la liste.</p>
+            <div class="form-actions">
+              <button type="button" class="btn-ghost" id="form-cancel">Annuler</button>
+              <button type="submit" class="btn-primary" id="form-submit">Ajouter</button>
+            </div>
+          </div>
+        </form>
 
-        </div>
       </div>
     </div>
+  </div>
 
+  <!-- Import CSV progress overlay -->
+  <div class="import-overlay hidden" id="import-overlay">
+    <div class="import-box">
+      <h2 class="import-title" id="import-title">Import CSV en cours…</h2>
+      <div class="import-progress-wrap">
+        <div class="import-progress-bar" id="import-progress-bar"></div>
+      </div>
+      <p class="import-status" id="import-status">Initialisation…</p>
+      <p class="import-current" id="import-current"></p>
+      <div class="import-log" id="import-log"></div>
+      <button class="btn-ghost import-abort-btn hidden" id="import-done-btn">Fermer</button>
+    </div>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
