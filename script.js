@@ -28,7 +28,7 @@ let films     = [];
 let series    = [];
 let anime     = [];
 let watchlist = [];
-let recommendations = [null, null, null];
+let recommendations = { films: [null, null, null], series: [null, null, null] };
 let _dataReady = false;
 
 let currentRenderData = [];
@@ -92,8 +92,9 @@ function loadUserData(uid) {
     series         = Object.values(d.series    || {});
     anime          = Object.values(d.anime     || {});
     watchlist      = Object.values(d.watchlist || {});
-    recommendations = d.recommendations ? Object.values(d.recommendations) : [null, null, null];
-    if (recommendations.length < 3) recommendations = [...recommendations, ...Array(3 - recommendations.length).fill(null)];
+    const rec = d.recommendations || {};
+    const toSlots = (arr) => { const a = Array.isArray(arr) ? arr : Object.values(arr || {}); return [...a, null, null, null].slice(0, 3); };
+    recommendations = { films: toSlots(rec.films), series: toSlots(rec.series) };
     currentRecFilm   = d.recommendationFilm   || null;
     currentRecSeries = d.recommendationSeries || null;
     _dataReady = true;
@@ -238,7 +239,11 @@ authSubmit.addEventListener('click', async () => {
       const cred   = await auth.createUserWithEmailAndPassword(email, password);
       await cred.user.updateProfile({ displayName: pseudo });
       await db.ref(`users/${cred.user.uid}/name`).set(pseudo);
-      await db.ref(`profiles/${cred.user.uid}/name`).set(pseudo);
+      await db.ref(`profiles/${cred.user.uid}`).set({
+        name:        pseudo,
+        accentColor: '#097ee5',
+        avatar:      'medias/pp.jpg',
+      });
     } else {
       await auth.signInWithEmailAndPassword(email, password);
     }
@@ -745,6 +750,8 @@ async function updateHomeHeaderForUid(uid) {
     initials.style.display = '';
   }
   document.getElementById('home-viewing-name').textContent = name;
+  const descElGuest = document.getElementById('home-app-desc');
+  if (descElGuest) descElGuest.textContent = p.description || '';
   applyAccentColor(p.accentColor || ACCENT_COLORS[0]);
   updateHomeViewingBanner();
   const filmsTitle    = document.getElementById('home-strip-films-title');
@@ -772,6 +779,8 @@ function restoreOwnHomeHeader() {
       avatar.style.display = 'none';
       initials.style.display = '';
     }
+    const descElOwn = document.getElementById('home-app-desc');
+    if (descElOwn) descElOwn.textContent = d.description || '';
     applyAccentColor(d.accentColor || ACCENT_COLORS[0]);
     const filmsTitle  = document.getElementById('home-strip-films-title');
     const seriesTitle = document.getElementById('home-strip-series-title');
@@ -842,14 +851,7 @@ function populateHomePage() {
         coverImg.src = saved;
         coverImg.style.display = 'block';
       } else {
-        const allItems = [...films, ...series, ...anime].filter(i => i.backdrop || i.poster);
-        const topItem  = allItems.sort((a, b) => (b.stars || 0) - (a.stars || 0))[0];
-        if (topItem) {
-          coverImg.src = topItem.backdrop || topItem.poster;
-          coverImg.style.display = 'block';
-        } else {
-          coverImg.style.display = 'none';
-        }
+        coverImg.style.display = 'none';
       }
     });
   }
@@ -948,6 +950,58 @@ function fillActivitySection() {
 
 // ── Recommandations ──────────────────────────────────────────
 let _recoPickerSlot = null;
+let _recoPickerType = 'films';
+
+function buildRecoSlots(container, type, isOwn) {
+  const group = document.createElement('div');
+  group.className = 'reco-group';
+
+  const label = document.createElement('p');
+  label.className = 'reco-group-label';
+  label.textContent = type === 'films' ? 'Films' : 'Séries';
+  group.appendChild(label);
+
+  const slots = document.createElement('div');
+  slots.className = 'reco-slots-row';
+
+  for (let i = 0; i < 3; i++) {
+    const item = recommendations[type][i];
+    const slot = document.createElement('div');
+    slot.className = 'reco-slot' + (item ? ' reco-slot-filled' : ' reco-slot-ghost');
+
+    if (item) {
+      slot.innerHTML = `
+        ${item.poster ? `<img class="reco-poster" src="${item.poster}" alt="" />` : `<div class="reco-poster reco-poster-empty"></div>`}
+        ${isOwn ? `<button class="reco-remove-btn">✕</button>` : ''}
+      `;
+      slot.style.cursor = 'pointer';
+      slot.addEventListener('click', e => {
+        if (e.target.closest('.reco-remove-btn')) return;
+        const found = [...films, ...series, ...anime].find(f => f.title === item.title);
+        if (found) openModal(found, slot);
+      });
+      if (isOwn) {
+        slot.querySelector('.reco-remove-btn').addEventListener('click', async e => {
+          e.stopPropagation();
+          recommendations[type][i] = null;
+          await saveRecommendations();
+          fillRecoSection();
+        });
+      }
+    } else if (isOwn) {
+      slot.innerHTML = `<span class="reco-add-label">+</span>`;
+      slot.style.cursor = 'pointer';
+      slot.addEventListener('click', () => openRecoPicker(i, type));
+    } else {
+      slot.innerHTML = `<span class="reco-empty-label">—</span>`;
+    }
+
+    slots.appendChild(slot);
+  }
+
+  group.appendChild(slots);
+  container.appendChild(group);
+}
 
 function fillRecoSection() {
   const container = document.getElementById('home-reco-list');
@@ -959,50 +1013,15 @@ function fillRecoSection() {
     const name = document.getElementById('home-app-title')?.textContent || '';
     titleEl.textContent = name ? `Recommandations de ${name}` : 'Recommandations';
   }
+
   container.innerHTML = '';
-
-  for (let i = 0; i < 3; i++) {
-    const item = recommendations[i];
-    const slot = document.createElement('div');
-    slot.className = 'reco-slot' + (item ? ' reco-slot-filled' : ' reco-slot-ghost');
-
-    if (item) {
-      slot.innerHTML = `
-        ${item.poster ? `<img class="reco-poster" src="${item.poster}" alt="" />` : `<div class="reco-poster reco-poster-empty"></div>`}
-        <div class="reco-info">
-          <p class="reco-title">${item.title}</p>
-          <p class="reco-meta">${item.year || ''}</p>
-        </div>
-        ${isOwn ? `<button class="reco-remove-btn" data-idx="${i}">✕</button>` : ''}
-      `;
-      slot.querySelector(':not(.reco-remove-btn)')?.addEventListener('click', e => {
-        if (e.target.closest('.reco-remove-btn')) return;
-        const found = [...films, ...series, ...anime].find(f => f.title === item.title);
-        if (found) openModal(found, slot);
-      });
-      slot.style.cursor = 'pointer';
-      if (isOwn) {
-        slot.querySelector('.reco-remove-btn')?.addEventListener('click', async e => {
-          e.stopPropagation();
-          recommendations[i] = null;
-          await saveRecommendations();
-          fillRecoSection();
-        });
-      }
-    } else if (isOwn) {
-      slot.innerHTML = `<span class="reco-add-label">+ Ajouter</span>`;
-      slot.style.cursor = 'pointer';
-      slot.addEventListener('click', () => openRecoPicker(i));
-    } else {
-      slot.innerHTML = `<span class="reco-empty-label">—</span>`;
-    }
-
-    container.appendChild(slot);
-  }
+  buildRecoSlots(container, 'films', isOwn);
+  buildRecoSlots(container, 'series', isOwn);
 }
 
-function openRecoPicker(slotIndex) {
+function openRecoPicker(slotIndex, type) {
   _recoPickerSlot = slotIndex;
+  _recoPickerType = type;
   const modal = document.getElementById('reco-picker-modal');
   const input = document.getElementById('reco-search-input');
   modal.classList.remove('hidden');
@@ -1013,15 +1032,11 @@ function openRecoPicker(slotIndex) {
 
 function renderRecoPickerResults(query) {
   const resultsEl = document.getElementById('reco-picker-results');
-  const pool = [...films, ...series, ...anime];
+  const pool = _recoPickerType === 'films' ? films : [...series, ...anime];
   const q = query.toLowerCase().trim();
-  const filtered = (q ? pool.filter(i => i.title.toLowerCase().includes(q)) : pool)
-    .slice(0, 10);
+  const filtered = (q ? pool.filter(i => i.title.toLowerCase().includes(q)) : pool).slice(0, 10);
 
-  if (!filtered.length) {
-    resultsEl.innerHTML = '<p class="tmdb-msg">Aucun résultat.</p>';
-    return;
-  }
+  if (!filtered.length) { resultsEl.innerHTML = '<p class="tmdb-msg">Aucun résultat.</p>'; return; }
 
   resultsEl.innerHTML = '';
   filtered.forEach(item => {
@@ -1035,7 +1050,7 @@ function renderRecoPickerResults(query) {
       </div>
     `;
     card.addEventListener('click', async () => {
-      recommendations[_recoPickerSlot] = { title: item.title, poster: item.poster || null, year: item.year || null };
+      recommendations[_recoPickerType][_recoPickerSlot] = { title: item.title, poster: item.poster || null, year: item.year || null };
       document.getElementById('reco-picker-modal').classList.add('hidden');
       await saveRecommendations();
       fillRecoSection();
@@ -1212,8 +1227,8 @@ auth.onAuthStateChanged(user => {
       document.getElementById('user-initials').textContent            = pseudo[0].toUpperCase();
       document.getElementById('home-user-initials').textContent       = pseudo[0].toUpperCase();
       document.getElementById('home-app-title').textContent           = pseudo;
-      const emailEl = document.getElementById('home-app-email');
-      if (emailEl) emailEl.textContent = user.email || '';
+      const descEl = document.getElementById('home-app-desc');
+      if (descEl) descEl.textContent = d.description || '';
       if (d.avatar) setAvatarDisplay(d.avatar);
       if (d.accentColor) applyAccentColor(d.accentColor);
     });
@@ -1853,8 +1868,11 @@ function openModal(item, triggerEl) {
 
   document.getElementById('modal-link').href =
     `https://www.google.com/search?q=${encodeURIComponent(item.title + ' allociné')}`;
-  document.getElementById('modal-trailer').href =
-    `https://www.google.com/search?q=${encodeURIComponent(item.title + ' bande annonce youtube')}`;
+  const trailerEl = document.getElementById('modal-trailer');
+  trailerEl.onclick = null;
+  trailerEl.href = item.youtubeId
+    ? `https://www.youtube.com/watch?v=${item.youtubeId}`
+    : `https://www.google.com/search?q=${encodeURIComponent(item.title + ' bande annonce youtube')}`;
 
   const isWatchlistItem = currentTab === 'watchlist';
   const isGuest = currentUser && currentViewUid !== currentUser.uid;
@@ -1922,6 +1940,7 @@ function openModal(item, triggerEl) {
   modalBackdrop.classList.add('open', 'film-modal');
   modalEl.classList.add('open');
 }
+
 
 function closeModal() {
   modalBackdrop.classList.remove('open', 'film-modal');
@@ -2628,14 +2647,16 @@ document.getElementById('entry-form').addEventListener('submit', e => {
   e.preventDefault();
   const isFilm = adminTab === 'films' || adminTab === 'watchlist';
 
-  const backdropVal = document.getElementById('f-backdrop').value.trim();
+  const backdropVal  = document.getElementById('f-backdrop').value.trim();
+  const youtubeIdVal = document.getElementById('f-youtube-id').value.trim();
   const entry = {
     title:    document.getElementById('f-title').value.trim(),
     genre:    document.getElementById('f-genre').value.split(',').map(g => g.trim()).filter(Boolean),
     poster:   document.getElementById('f-poster').value.trim(),
     url:      '#',
     year:     parseInt(document.getElementById('f-year').value) || null,
-    ...(backdropVal ? { backdrop: backdropVal } : {}),
+    ...(backdropVal  ? { backdrop:   backdropVal  } : {}),
+    ...(youtubeIdVal ? { youtubeId: youtubeIdVal } : {}),
   };
 
   if (isFilm) {
@@ -2684,6 +2705,14 @@ function adminUpdatePosterPreview(url) {
 async function adminTmdbFetch(endpoint) {
   const sep = endpoint.includes('?') ? '&' : '?';
   const res = await fetch(`https://api.themoviedb.org/3${endpoint}${sep}api_key=${TMDB_KEY}&language=fr-FR`);
+  if (!res.ok) throw new Error(`TMDB ${res.status}`);
+  return res.json();
+}
+
+async function adminTmdbFetchVideos(tmdbType, tmdbId) {
+  const res = await fetch(
+    `https://api.themoviedb.org/3/${tmdbType}/${tmdbId}/videos?api_key=${TMDB_KEY}&include_video_language=fr,en,null`
+  );
   if (!res.ok) throw new Error(`TMDB ${res.status}`);
   return res.json();
 }
@@ -2773,6 +2802,9 @@ async function adminTmdbAutoFill(id, type) {
     const genres = (details.genres || []).slice(0, 2).map(g => adminTranslateGenre(g.name));
     document.getElementById('f-genre').value    = genres.join(', ');
     document.getElementById('f-backdrop').value = details.backdrop_path ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}` : '';
+    const videosData = await adminTmdbFetchVideos(type, id);
+    const trailer = (videosData.results || []).find(v => v.type === 'Trailer' && v.site === 'YouTube') || (videosData.results || []).find(v => v.site === 'YouTube');
+    document.getElementById('f-youtube-id').value = trailer?.key || '';
     adminUpdatePosterPreview(document.getElementById('f-poster').value);
     const _poster = document.getElementById('f-poster').value;
     const _title  = document.getElementById('f-title').value;
@@ -2944,5 +2976,111 @@ async function runCsvImport(rows) {
 
 document.getElementById('import-done-btn').addEventListener('click', () => {
   document.getElementById('import-overlay').classList.add('hidden');
+});
+
+// ── Fetch Trailers ────────────────────────────────────────────
+document.getElementById('admin-fetch-trailers-btn').addEventListener('click', runFetchTrailers);
+
+async function runFetchTrailers() {
+  if (!currentUser) return;
+
+  const overlay   = document.getElementById('trailers-overlay');
+  const barEl     = document.getElementById('trailers-progress-bar');
+  const statusEl  = document.getElementById('trailers-status');
+  const currentEl = document.getElementById('trailers-current');
+  const logEl     = document.getElementById('trailers-log');
+  const doneBtn   = document.getElementById('trailers-done-btn');
+
+  overlay.classList.remove('hidden');
+  logEl.innerHTML = '';
+  doneBtn.classList.add('hidden');
+  barEl.style.width = '0%';
+
+  function log(msg, type = '') {
+    const p = document.createElement('p');
+    p.className = type ? `import-log-${type}` : '';
+    p.textContent = msg;
+    logEl.appendChild(p);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  const snap = await db.ref(`users/${currentUser.uid}`).once('value');
+  const d = snap.val() || {};
+  const lists = {
+    films:  Object.entries(d.films  || {}),
+    series: Object.entries(d.series || {}),
+    anime:  Object.entries(d.anime  || {}),
+  };
+
+  const allEntries = [
+    ...lists.films.map(([k, v])  => ({ key: k, item: v, list: 'films',  isSeries: false })),
+    ...lists.series.map(([k, v]) => ({ key: k, item: v, list: 'series', isSeries: true  })),
+    ...lists.anime.map(([k, v])  => ({ key: k, item: v, list: 'anime',  isSeries: true  })),
+  ].filter(e => e.item && e.item.title && !e.item.youtubeId);
+
+  const total = allEntries.length;
+  if (total === 0) {
+    statusEl.textContent = '✓ Tous les titres ont déjà une bande-annonce.';
+    doneBtn.classList.remove('hidden');
+    return;
+  }
+
+  statusEl.textContent = `0 / ${total} titres traités`;
+  let updated = 0, failed = 0;
+
+  for (let i = 0; i < allEntries.length; i++) {
+    const { key, item, list, isSeries } = allEntries[i];
+    barEl.style.width = `${Math.round((i / total) * 100)}%`;
+    statusEl.textContent = `${i + 1} / ${total} titres traités`;
+    currentEl.textContent = item.title;
+
+    try {
+      const q = encodeURIComponent(item.title);
+      let tmdbId = null, tmdbType = null;
+
+      if (isSeries) {
+        const tv = await adminTmdbFetch(`/search/tv?query=${q}`);
+        if (tv.results?.length) { tmdbId = tv.results[0].id; tmdbType = 'tv'; }
+        else {
+          const mv = await adminTmdbFetch(`/search/movie?query=${q}`);
+          if (mv.results?.length) { tmdbId = mv.results[0].id; tmdbType = 'movie'; }
+        }
+      } else {
+        const mv = await adminTmdbFetch(`/search/movie?query=${q}`);
+        if (mv.results?.length) { tmdbId = mv.results[0].id; tmdbType = 'movie'; }
+        else {
+          const tv = await adminTmdbFetch(`/search/tv?query=${q}`);
+          if (tv.results?.length) { tmdbId = tv.results[0].id; tmdbType = 'tv'; }
+        }
+      }
+
+      if (!tmdbId) { log(`⚠ Non trouvé : ${item.title}`, 'err'); failed++; await delay(250); continue; }
+
+      const videos = await adminTmdbFetchVideos(tmdbType, tmdbId);
+      const trailer = (videos.results || []).find(v => v.type === 'Trailer' && v.site === 'YouTube')
+                   || (videos.results || []).find(v => v.site === 'YouTube');
+
+      if (!trailer) { log(`⚠ Pas de trailer : ${item.title}`, 'err'); failed++; await delay(250); continue; }
+
+      await db.ref(`users/${currentUser.uid}/${list}/${key}/youtubeId`).set(trailer.key);
+      log(`✓ ${item.title}`, 'ok');
+      updated++;
+      await delay(280);
+    } catch (err) {
+      log(`✕ Erreur : ${item.title} — ${err.message}`, 'err');
+      failed++;
+      await delay(280);
+    }
+  }
+
+  barEl.style.width = '100%';
+  statusEl.textContent = `✓ Terminé — ${updated} ajoutés, ${failed} échecs.`;
+  currentEl.textContent = '';
+  doneBtn.classList.remove('hidden');
+  await loadUserData(currentUser.uid);
+}
+
+document.getElementById('trailers-done-btn').addEventListener('click', () => {
+  document.getElementById('trailers-overlay').classList.add('hidden');
 });
 

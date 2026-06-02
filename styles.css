@@ -4,6 +4,45 @@
   --bg-color: rgb(13, 13, 13)
 }
 
+/* ── Modal YouTube ── */
+.yt-modal {
+  position: fixed; inset: 0; z-index: 1600;
+  background: rgba(0,0,0,0.88);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.yt-modal.hidden { display: none; }
+.yt-modal-inner {
+  position: relative;
+  width: 100%; max-width: 900px;
+}
+.yt-embed-wrap {
+  position: relative; padding-bottom: 56.25%; height: 0;
+  border-radius: 12px; overflow: hidden;
+}
+.yt-embed-wrap iframe {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+}
+.yt-modal-close {
+  position: absolute; top: -40px; right: 0;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+  color: #fff; border-radius: 50%; width: 32px; height: 32px;
+  font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.yt-modal-close:hover { background: rgba(255,255,255,0.2); }
+#yt-fallback {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; color: #fff; text-decoration: none;
+  background: #0d0d0d; border-radius: 12px;
+  font-size: 15px; font-weight: 600;
+  transition: background 0.15s;
+}
+#yt-fallback:hover { background: #1a1a1a; }
+#yt-fallback svg { fill: #ff0000; }
+
 /* Éléments fantômes JS — toujours invisibles */
 #user-menu-avatar-img,
 #user-menu-avatar-initial,
@@ -1808,6 +1847,7 @@ header {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   flex: 1;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.12);
@@ -2825,7 +2865,7 @@ header {
   line-height: 1;
 }
 
-.home-app-email {
+.home-app-desc {
   font-size: 11px;
   color: rgba(255,255,255,0.35);
   margin: 0;
@@ -2894,11 +2934,12 @@ header {
   align-items: center;
   gap: 12px;
   padding: 8px 8px 8px 12px;
-  border-radius: 12px;
-  transition: background 0.15s;
+  border-radius: 2px;
+  transition: all 0.15s;
 }
 
 .activity-item:hover {
+  border-radius: 12px;
   background-color: rgba(255, 255, 255, 0.02);
 }
 
@@ -2964,9 +3005,15 @@ header {
 #home-reco-list {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 6px;
   margin-top: 8px;
   width: 100%;
+}
+.reco-group { display: flex; flex-direction: row; gap: 6px; flex: 1; }
+.reco-group + .reco-group { border-left: 1px solid rgba(255,255,255,0.08); padding-left: 6px; }
+.reco-group-label { display: none; }
+.reco-slots-row {
+  display: contents;
 }
 .reco-slot {
   flex: 1;
@@ -3265,10 +3312,16 @@ header {
   align-items: center;
   gap: 7px;
   cursor: pointer;
-  width: 72px;
-  transition: transform 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  padding: 12px 20px 12px 20px;
+  width: 100px;
+  transition: all 0.2s;
 }
-.home-community-card:hover { transform: translateY(-4px); }
+.home-community-card:hover { 
+  background-color: rgba(255, 255, 255, 0.05);
+}
 
 .home-community-avatar {
   width: 60px;
