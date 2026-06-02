@@ -1,6 +1,6 @@
 :root {
   --accent: #097ee5;
-  --star-color: #ff9a00;
+  --star-color: #ffbb00;
   --bg-color: rgb(13, 13, 13)
 }
 
@@ -34,7 +34,7 @@ body {
     #0d0d0d;
   background-attachment: fixed;
   color: #f0f0f0;
-  font-family: 'Figtree', 'Segoe UI', sans-serif;
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
   font-size: 13px;
   min-height: 100vh;
   display: flex;
@@ -994,6 +994,16 @@ header {
   border-color: rgba(255,255,255,0.25);
 }
 
+.person-section {
+  padding: 12px 24px 0;
+}
+
+.sidebar-display-prefs {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 16px;
+  margin-top: 8px;
+}
+
 #sidebar-person-badges {
   display: flex;
   flex-wrap: wrap;
@@ -1092,6 +1102,8 @@ header {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
 .sidebar-edit-btn {
@@ -1384,6 +1396,15 @@ header {
   opacity: 0.6;
 }
 
+/* ── Ghost cards ── */
+.ghost-card {
+  border-radius: 12px;
+  background: rgba(255,255,255,0.01);
+  border: 1px solid rgba(255,255,255,0.02);
+  aspect-ratio: 2/3;
+  pointer-events: none;
+}
+
 /* ── Card ── */
 .card-wrapper {
   display: flex;
@@ -1561,6 +1582,7 @@ header {
   position: relative;
   flex: 1;
   min-height: 0;
+  max-height: 500px;
   overflow: hidden;
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 35%, black 65%, transparent 100%);
   mask-image: linear-gradient(to right, transparent 0%, black 35%, black 65%, transparent 100%);
@@ -1700,14 +1722,13 @@ header {
 
 .star.active { color: var(--star-color); }
 
-.grid.compact .card-stars { display: none; }
 
 .card-stars {
   position: absolute;
   top: 0px;
   right: 0px;
   background: rgba(0, 0, 0, 0.55);
-  border-radius: 0px 9px 0px 8px;
+  border-radius: 0px 6px 0px 8px;
   height: 22px;
   display: flex;
   align-items: center;
@@ -1716,7 +1737,16 @@ header {
   gap: 3px;
   font-size: 11px;
   font-weight: 700;
-  color: white;
+  color: var(--star-color);
+}
+.card-stars-icon {
+  display: flex;
+  align-items: center;
+  color: var(--star-color);
+}
+.card-stars-icon svg {
+  width: 8px;
+  height: 8px;
 }
 
 .modal-divider {
@@ -1908,9 +1938,18 @@ header {
   background: #0d0d0d;
   z-index: 2000;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.35s ease;
+  gap: 24px;
+  transition: opacity 0.6s ease;
+}
+
+.loader-logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+  opacity: 0.9;
 }
 
 .page-loader.fade-out { opacity: 0; pointer-events: none; }
@@ -2333,14 +2372,24 @@ header {
 }
 
 /* ── Viewing banner ── */
+#home-viewing-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+}
+
 .viewing-banner {
   display: none;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   padding: 6px 24px;
-  background: color-mix(in srgb, var(--accent) 18%, #0d0d0d);
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, #0d0d0d);
+  background: color-mix(in srgb, var(--accent) 12%, rgba(13,13,13,0.7));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
   font-size: 13px;
   color: var(--accent);
 }
@@ -2659,12 +2708,23 @@ header {
 .home-page.hidden { display: none; }
 
 /* ── Home header profil ── */
+.home-logo {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  height: 28px;
+  width: auto;
+  z-index: 10;
+  object-fit: contain;
+}
+
 .home-header {
   margin-top: -30px;
   display: flex;
   flex-direction: column;
   align-items: center;
   background: transparent;
+  position: relative;
 }
 
 .home-cover {
@@ -2732,7 +2792,7 @@ header {
   flex-shrink: 0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.7);
 }
-.home-user-btn:hover { border-color: rgba(255,255,255,0.3); }
+.home-user-btn:hover { border-color: var(--accent); }
 
 .home-user-avatar {
   position: absolute;
@@ -2757,7 +2817,7 @@ header {
 
 .home-app-title {
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
   letter-spacing: -0.4px;
   margin: 0;
@@ -2816,7 +2876,175 @@ header {
   letter-spacing: 0.06em;
 }
 
-.home-content { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 28px 0 0; }
+.home-content { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 28px 20px; }
+
+/* ── Activité récente ── */
+#home-activity-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 8px;
+}
+.activity-item + .activity-item {
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 12px;
+  border-radius: 12px;
+  transition: background 0.15s;
+}
+
+.activity-item:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.activity-delete-btn {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #888;
+  border-radius: 50%;
+  width: 26px; height: 26px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.activity-item:hover .activity-delete-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+.activity-delete-btn:hover { background: rgba(224,85,85,0.2); border-color: rgba(224,85,85,0.35); color: #e05555; }
+.activity-confirm-btn {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  background: rgba(224,85,85,0.15);
+  border: 1px solid rgba(224,85,85,0.35);
+  color: #e05555;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.activity-confirm-btn:hover { background: rgba(224,85,85,0.28); }
+.activity-poster {
+  width: 56px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.activity-poster-empty {
+  background: rgba(255,255,255,0.05);
+}
+.activity-info {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  padding: 8px 12px;
+}
+.activity-empty { font-size: 13px; color: #555; padding: 12px 0; }
+
+/* ── Recommandations ── */
+#home-reco-list {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+}
+.reco-slot {
+  flex: 1;
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 2/3;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.reco-slot-filled:hover { opacity: 0.85; }
+.reco-slot-ghost {
+  border: 1px dashed rgba(255,255,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+}
+.reco-slot-ghost:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.28); }
+.reco-add-label { font-size: 12px; color: #555; font-weight: 600; }
+.reco-empty-label { font-size: 12px; color: #333; }
+.reco-poster {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.reco-poster-empty { width: 100%; height: 100%; background: rgba(255,255,255,0.04); }
+.reco-info { display: none; }
+.reco-remove-btn {
+  opacity: 0; pointer-events: none;
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,0.65); border: 1px solid rgba(255,255,255,0.15);
+  color: #ccc; border-radius: 50%; width: 22px; height: 22px;
+  font-size: 10px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  z-index: 2;
+}
+.reco-slot-filled:hover .reco-remove-btn { opacity: 1; pointer-events: auto; }
+.reco-remove-btn:hover { background: rgba(224,85,85,0.7); border-color: #e05555; color: #fff; }
+
+/* ── Reco picker modal ── */
+.reco-picker-box { max-width: 480px; }
+.reco-picker-results {
+  display: flex; flex-direction: column; gap: 0;
+  margin-top: 12px; max-height: 340px; overflow-y: auto;
+}
+.reco-picker-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 10px; border-radius: 10px; cursor: pointer;
+  transition: background 0.15s;
+}
+.reco-picker-card:hover { background: rgba(255,255,255,0.06); }
+.reco-picker-card img {
+  width: 32px; height: 48px; object-fit: cover; border-radius: 5px; flex-shrink: 0;
+}
+.reco-picker-card-no-poster {
+  width: 32px; height: 48px; border-radius: 5px;
+  background: rgba(255,255,255,0.05); flex-shrink: 0;
+}
+.reco-picker-card-title { font-size: 13px; font-weight: 600; color: #f0f0f0; }
+.reco-picker-card-year  { font-size: 11px; color: #666; margin-top: 2px; }
+.activity-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f0f0f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-watched { font-size: 11px; color: #555; margin-bottom: 2px; }
+.activity-stars { display: flex; gap: 2px; margin: 3px 0; }
+.activity-star { display: flex; color: rgba(255,255,255,0.12); }
+.activity-star svg { width: 9px; height: 9px; }
+.activity-star.filled { color: var(--star-color); }
+.activity-date {
+  font-size: 11px;
+  color: #555;
+  margin-top: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 .home-divider {
   width: calc(100% - 48px);
@@ -2829,7 +3057,7 @@ header {
 }
 
 .home-row {
-  display: flex; flex-direction: row; gap: 0px;
+  display: flex; flex-direction: row; gap: 10px;
   width: 100%; max-width: 1000px;
   padding-left: 0px;
   padding-right: 0px;
@@ -2843,7 +3071,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding: 0 6px;
 }
 
 .home-carousel-edit-btn {
@@ -2866,9 +3094,26 @@ header {
   color: #fff;
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
+.home-carousel-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-strip-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 99px;
+  padding: 2px 8px;
+  line-height: 1.4;
+}
+
 .home-carousel-title {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 500;
   color: #fff;
   margin: 0;
 }
@@ -2914,7 +3159,7 @@ header {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 4px 20px;
+  padding: 4px 0px;
   cursor: pointer;
 }
 .home-strip-empty {
@@ -2972,10 +3217,10 @@ header {
 .home-carousel-add-btn {
   flex-shrink: 0;
   aspect-ratio: 2/3;
-  height: calc(clamp(72px, 20vw, 96px) * 1.5);
+  height: calc(clamp(72px, 20vw, 102px) * 1.5);
   border-radius: 8px;
-  background: rgba(255,255,255,0.04);
-  border: 1px dashed rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.04); 
+  border: 2px solid color-mix(in srgb, var(--accent) 15%, rgba(255,255,255,0.06));
   color: rgba(255,255,255,0.35);
   cursor: pointer;
   display: flex;
@@ -3008,7 +3253,7 @@ header {
   scrollbar-width: none;
   align-items: flex-start;
   justify-content: left;
-  padding: 20px 20px 12px;
+  padding: 20px 0px 12px;
   gap: 14px;
 }
 .home-strip-community::-webkit-scrollbar { display: none; }
@@ -3374,7 +3619,7 @@ header {
 .img-picker-grid {
   flex: 1; overflow-y: auto;
   display: grid;
-  gap: 8px;
+  gap: 16px;
   padding: 0 20px;
 }
 .img-picker-grid.grid-cover { grid-template-columns: repeat(2, 1fr); }
@@ -3422,12 +3667,14 @@ header {
   overflow-y: auto;
 }
 .ep-cover-item {
-  aspect-ratio: 16/9;
+  height: 100%;
+  height: 120px;
+  width: 100%;
+  max-width: 120px;
   border-radius: 8px;
   border-color: transparent;
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid transparent;
   transition: border-color 0.15s, transform 0.15s;
   position: relative;
 }
@@ -3878,13 +4125,13 @@ header {
 #result-count { display: none; }
   #time-count { display: none; }
 
-  .home-app-title { margin-bottom: 15px;}
+  .home-app-title { margin-bottom: 4px;}
 
   .home-profile-bar {
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    margin-top: -30px;
+    margin-top: -70px;
     padding-bottom: 16px;
   }
   .home-profile-left {
@@ -3928,8 +4175,12 @@ header {
     position: relative;
     width: 100vw;
     max-width: 100vw;
-    height: 160px;
+    height: 240px;
     overflow: hidden;
+  }
+  .home-logo {
+    left: 50%;
+    transform: translateX(-50%);
   }
 
 }

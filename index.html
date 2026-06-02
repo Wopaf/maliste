@@ -6,13 +6,14 @@
   <title>Mes Films & Séries</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
   <!-- ── Loader ── -->
   <div id="page-loader" class="page-loader">
+    <img src="medias/logo1.png" class="loader-logo" alt="Logo" />
     <div class="loader-spinner"></div>
   </div>
 
@@ -39,6 +40,7 @@
       <div class="home-cover">
         <img class="home-header-bg" id="home-header-bg" src="" alt="" style="display:none" />
         <div class="home-cover-gradient"></div>
+        <img class="home-logo" src="medias/logo1.png" alt="Logo" />
       </div>
       <div class="home-profile-bar">
         <div class="home-profile-left">
@@ -57,22 +59,46 @@
     <div class="home-content">
       <section class="home-carousel" id="home-section-watchlist">
         <div class="home-carousel-hdr">
-          <h2 class="home-carousel-title" id="home-strip-watchlist-title">Ma Watchlist</h2>
+          <div class="home-carousel-title-group">
+            <h2 class="home-carousel-title" id="home-strip-watchlist-title">Ma Watchlist</h2>
+            <span class="home-strip-badge" id="home-badge-watchlist"></span>
+          </div>
         </div>
         <div class="home-strip" id="home-strip-watchlist"></div>
       </section>
       <div class="home-row">
         <section class="home-carousel">
           <div class="home-carousel-hdr">
-            <h2 class="home-carousel-title" id="home-strip-films-title">Mes Films</h2>
+            <div class="home-carousel-title-group">
+              <h2 class="home-carousel-title" id="home-strip-films-title">Mes Films</h2>
+              <span class="home-strip-badge" id="home-badge-films"></span>
+            </div>
           </div>
           <div class="home-strip" id="home-strip-films"></div>
         </section>
         <section class="home-carousel">
           <div class="home-carousel-hdr">
-            <h2 class="home-carousel-title" id="home-strip-series-title">Mes Séries</h2>
+            <div class="home-carousel-title-group">
+              <h2 class="home-carousel-title" id="home-strip-series-title">Mes Séries</h2>
+              <span class="home-strip-badge" id="home-badge-series"></span>
+            </div>
           </div>
           <div class="home-strip" id="home-strip-series"></div>
+        </section>
+      </div>
+      <hr class="home-divider">
+      <div class="home-row home-row-activity">
+        <section class="home-carousel" id="home-section-reco">
+          <div class="home-carousel-hdr">
+            <h2 class="home-carousel-title">Recommandations</h2>
+          </div>
+          <div id="home-reco-list"></div>
+        </section>
+        <section class="home-carousel" id="home-section-activity">
+          <div class="home-carousel-hdr">
+            <h2 class="home-carousel-title">Activité récente</h2>
+          </div>
+          <div id="home-activity-list"></div>
         </section>
       </div>
       <hr class="home-divider">
@@ -132,6 +158,8 @@
           <li class="dropdown-item" data-value="alpha-desc">Z → A</li>
           <li class="dropdown-item" data-value="year-desc">Récent</li>
           <li class="dropdown-item" data-value="year-asc">Ancien</li>
+          <li class="dropdown-item" data-value="added-desc">Ajouté récemment</li>
+          <li class="dropdown-item" data-value="added-asc">Ajouté anciennement</li>
           <li class="dropdown-item" data-value="stars-desc">Mieux notés</li>
           <li class="dropdown-item" data-value="stars-asc">Moins notés</li>
         </ul>
@@ -160,14 +188,13 @@
 
   <div class="app-body">
     <div class="app-main-col">
+      <section id="sidebar-person-section" class="person-section" style="display:none">
+        <div id="sidebar-person-badges"></div>
+      </section>
       <main id="grid" class="grid"></main>
       <div id="load-more-wrap" class="load-more-wrap" style="display:none"></div>
     </div>
     <aside class="stats-sidebar" id="stats-sidebar">
-      <section class="sidebar-section" id="sidebar-person-section" style="display:none">
-        <h3 class="sidebar-title">Personnes</h3>
-        <div id="sidebar-person-badges"></div>
-      </section>
       <div class="sidebar-btn-group">
         <button class="sidebar-edit-btn" id="sidebar-edit-btn">
           <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 0 24 24" width="14px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M3 17.46v3.04c0 .28.22.5.5.5h3.04c.13 0 .26-.05.35-.15L17.81 9.94l-3.75-3.75L3.15 17.1c-.1.1-.15.22-.15.36zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
@@ -280,6 +307,7 @@
 
         <div class="modal-bottom-actions">
           <button class="modal-copy-btn hidden" id="modal-copy-btn">Copier dans ma liste</button>
+          <button class="modal-copy-btn hidden" id="modal-watchlist-btn">+ Ma Watchlist</button>
           <div class="modal-transfer-actions hidden" id="modal-transfer-actions">
             <button class="modal-transfer-btn" id="modal-transfer-films"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM235.5-272Q125-344 61-462q-5-9-7.5-18.5T51-500q0-10 2.5-19.5T61-538q64-118 174.5-190T480-800q134 0 244.5 72T899-538q5 9 7.5 18.5T909-500q0 10-2.5 19.5T899-462q-64 118-174.5 190T480-200q-134 0-244.5-72ZM480-500Zm207.5 160.5Q782-399 832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280q113 0 207.5-59.5Z"/></svg> Marquer ce Film comme vu</button>
             <button class="modal-transfer-btn" id="modal-transfer-series"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM235.5-272Q125-344 61-462q-5-9-7.5-18.5T51-500q0-10 2.5-19.5T61-538q64-118 174.5-190T480-800q134 0 244.5 72T899-538q5 9 7.5 18.5T909-500q0 10-2.5 19.5T899-462q-64 118-174.5 190T480-200q-134 0-244.5-72ZM480-500Zm207.5 160.5Q782-399 832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280q113 0 207.5-59.5Z"/></svg> Marquer cette Série comme vue</button>
@@ -588,6 +616,25 @@
           </div>
         </form>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal picker recommandations -->
+  <div class="admin-modal hidden" id="reco-picker-modal">
+    <div class="modal-box reco-picker-box">
+      <div class="modal-header">
+        <h2>Choisir un titre</h2>
+        <button class="modal-close-btn" id="reco-picker-close">✕</button>
+      </div>
+      <div class="modal-body" style="padding:16px 24px;">
+        <div class="search-bar" id="reco-search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="reco-search-input" placeholder="Rechercher un film ou une série…" autocomplete="off" />
+        </div>
+        <div id="reco-picker-results" class="reco-picker-results"></div>
       </div>
     </div>
   </div>

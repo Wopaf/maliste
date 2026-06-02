@@ -15,7 +15,7 @@ setTimeout(() => {
   const loader = document.getElementById('page-loader');
   loader.classList.add('fade-out');
   loader.addEventListener('transitionend', () => loader.remove(), { once: true });
-}, 650);
+}, 800);
 
 firebase.initializeApp(FIREBASE_CONFIG);
 const db   = firebase.database();
@@ -28,6 +28,7 @@ let films     = [];
 let series    = [];
 let anime     = [];
 let watchlist = [];
+let recommendations = [null, null, null];
 let _dataReady = false;
 
 let currentRenderData = [];
@@ -87,10 +88,12 @@ function loadUserData(uid) {
   films = []; series = []; anime = [];
   db.ref(`users/${uid}`).once('value', snap => {
     const d = snap.val() || {};
-    films     = Object.values(d.films     || {});
-    series    = Object.values(d.series    || {});
-    anime     = Object.values(d.anime     || {});
-    watchlist = Object.values(d.watchlist || {});
+    films          = Object.values(d.films     || {});
+    series         = Object.values(d.series    || {});
+    anime          = Object.values(d.anime     || {});
+    watchlist      = Object.values(d.watchlist || {});
+    recommendations = d.recommendations ? Object.values(d.recommendations) : [null, null, null];
+    if (recommendations.length < 3) recommendations = [...recommendations, ...Array(3 - recommendations.length).fill(null)];
     currentRecFilm   = d.recommendationFilm   || null;
     currentRecSeries = d.recommendationSeries || null;
     _dataReady = true;
@@ -274,7 +277,7 @@ const homeUserBtn  = document.getElementById('home-user-btn');
 const userMenu     = document.getElementById('user-menu');
 const backHomeBtn  = document.getElementById('back-home-btn');
 
-backHomeBtn.addEventListener('click', () => showHomePage());
+backHomeBtn.addEventListener('click', () => { if (searchInput.value) searchClear.click(); showHomePage(); });
 
 function toggleUserMenu(anchor, e) {
   e.stopPropagation();
@@ -679,10 +682,15 @@ function switchToUser(uid) {
 
 document.getElementById('back-my-list-btn').addEventListener('click', () => {
   if (!currentUser) return;
+  if (searchInput.value) searchClear.click();
   switchToUser(currentUser.uid);
 });
 
 document.getElementById('home-back-btn').addEventListener('click', () => {
+  if (currentUser) {
+    switchToUser(currentUser.uid);
+    restoreOwnHomeHeader();
+  }
   showHomePage();
 });
 
@@ -781,11 +789,6 @@ function updateHomeViewingBanner() {
 }
 
 function showHomePage() {
-  const wasGuest = currentUser && currentViewUid !== currentUser.uid;
-  if (wasGuest) {
-    switchToUser(currentUser.uid);
-    restoreOwnHomeHeader();
-  }
   mainApp.classList.add('sliding-out');
   setTimeout(() => {
     mainApp.classList.remove('sliding-out');
@@ -813,6 +816,7 @@ function switchTab(tab) {
 function navigateToApp(tab) {
   homePage.classList.add('hidden');
   mainApp.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'instant' });
   if (tab) switchTab(tab);
   else render();
 }
@@ -822,6 +826,13 @@ function populateHomePage() {
   fillStrip('home-strip-series',    [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length);
   fillStrip('home-strip-watchlist', [...watchlist], watchlist.length, true, 10, 2);
   fillCommunityStrip();
+  fillActivitySection();
+  fillRecoSection();
+
+  const setBadge = (id, count) => { const el = document.getElementById(id); if (el) el.textContent = count > 0 ? count : ''; };
+  setBadge('home-badge-films',     films.length);
+  setBadge('home-badge-series',    series.length + anime.length);
+  setBadge('home-badge-watchlist', watchlist.length);
 
   const coverImg = document.getElementById('home-header-bg');
   if (coverImg) {
@@ -855,6 +866,200 @@ function populateHomePage() {
     `;
   }
 }
+
+function fillActivitySection() {
+  const container = document.getElementById('home-activity-list');
+  const section   = document.getElementById('home-section-activity');
+  if (!container) return;
+
+  const recent = [...films, ...series, ...anime]
+    .filter(i => i.addedAt)
+    .sort((a, b) => b.addedAt.localeCompare(a.addedAt))
+    .slice(0, 10);
+
+  if (section) section.style.display = '';
+  if (!recent.length) {
+    container.innerHTML = '<p class="activity-empty">Aucune activité récente</p>';
+    return;
+  }
+
+  container.innerHTML = '';
+  recent.forEach(item => {
+    const isSeries = !!(item.seasons || item.episodes);
+    const typeLabel = isSeries ? 'Série' : 'Film';
+    const el = document.createElement('div');
+    el.className = 'activity-item';
+    const dateStr = new Date(item.addedAt).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const isOwn = currentUser && currentViewUid === currentUser.uid;
+    const starSvg = `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>`;
+    const starsHtml = item.stars ? `<div class="activity-stars">${Array.from({length:10}, (_,i) =>
+      `<span class="activity-star${i < item.stars ? ' filled' : ''}">${starSvg}</span>`
+    ).join('')}</div>` : '';
+    el.innerHTML = `
+      ${item.poster ? `<img class="activity-poster" src="${item.poster}" alt="" />` : `<div class="activity-poster activity-poster-empty"></div>`}
+      <div class="activity-info">
+        <p class="activity-watched">A visionné</p>
+        <p class="activity-title">${item.title}</p>
+        ${starsHtml}
+        <p class="activity-date">le ${dateStr}</p>
+        ${isOwn ? `<button class="activity-delete-btn" title="Retirer de l'activité">✕</button>` : ''}
+      </div>
+    `;
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', e => {
+      if (e.target.closest('.activity-delete-btn')) return;
+      const found = [...films, ...series, ...anime].find(i => i.title === item.title);
+      if (found) openModal(found, el);
+    });
+    if (isOwn) {
+      el.querySelector('.activity-delete-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = 'activity-confirm-btn';
+        confirmBtn.textContent = 'Supprimer cette activité';
+        el.querySelector('.activity-delete-btn').replaceWith(confirmBtn);
+
+        confirmBtn.addEventListener('click', async e => {
+          e.stopPropagation();
+          let arr, arrName;
+          if (films.find(i => i.title === item.title))       { arr = films;  arrName = 'films'; }
+          else if (series.find(i => i.title === item.title)) { arr = series; arrName = 'series'; }
+          else                                               { arr = anime;  arrName = 'anime'; }
+          const idx = arr.findIndex(i => i.title === item.title);
+          if (idx !== -1) {
+            delete arr[idx].addedAt;
+            await db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
+            fillActivitySection();
+          }
+        });
+
+        const onClickOutside = e => {
+          if (!el.contains(e.target)) {
+            fillActivitySection();
+            document.removeEventListener('click', onClickOutside);
+          }
+        };
+        setTimeout(() => document.addEventListener('click', onClickOutside), 0);
+      });
+    }
+    container.appendChild(el);
+  });
+}
+
+// ── Recommandations ──────────────────────────────────────────
+let _recoPickerSlot = null;
+
+function fillRecoSection() {
+  const container = document.getElementById('home-reco-list');
+  if (!container) return;
+  const isOwn = currentUser && currentViewUid === currentUser.uid;
+
+  const titleEl = document.querySelector('#home-section-reco .home-carousel-title');
+  if (titleEl) {
+    const name = document.getElementById('home-app-title')?.textContent || '';
+    titleEl.textContent = name ? `Recommandations de ${name}` : 'Recommandations';
+  }
+  container.innerHTML = '';
+
+  for (let i = 0; i < 3; i++) {
+    const item = recommendations[i];
+    const slot = document.createElement('div');
+    slot.className = 'reco-slot' + (item ? ' reco-slot-filled' : ' reco-slot-ghost');
+
+    if (item) {
+      slot.innerHTML = `
+        ${item.poster ? `<img class="reco-poster" src="${item.poster}" alt="" />` : `<div class="reco-poster reco-poster-empty"></div>`}
+        <div class="reco-info">
+          <p class="reco-title">${item.title}</p>
+          <p class="reco-meta">${item.year || ''}</p>
+        </div>
+        ${isOwn ? `<button class="reco-remove-btn" data-idx="${i}">✕</button>` : ''}
+      `;
+      slot.querySelector(':not(.reco-remove-btn)')?.addEventListener('click', e => {
+        if (e.target.closest('.reco-remove-btn')) return;
+        const found = [...films, ...series, ...anime].find(f => f.title === item.title);
+        if (found) openModal(found, slot);
+      });
+      slot.style.cursor = 'pointer';
+      if (isOwn) {
+        slot.querySelector('.reco-remove-btn')?.addEventListener('click', async e => {
+          e.stopPropagation();
+          recommendations[i] = null;
+          await saveRecommendations();
+          fillRecoSection();
+        });
+      }
+    } else if (isOwn) {
+      slot.innerHTML = `<span class="reco-add-label">+ Ajouter</span>`;
+      slot.style.cursor = 'pointer';
+      slot.addEventListener('click', () => openRecoPicker(i));
+    } else {
+      slot.innerHTML = `<span class="reco-empty-label">—</span>`;
+    }
+
+    container.appendChild(slot);
+  }
+}
+
+function openRecoPicker(slotIndex) {
+  _recoPickerSlot = slotIndex;
+  const modal = document.getElementById('reco-picker-modal');
+  const input = document.getElementById('reco-search-input');
+  modal.classList.remove('hidden');
+  input.value = '';
+  renderRecoPickerResults('');
+  setTimeout(() => input.focus(), 50);
+}
+
+function renderRecoPickerResults(query) {
+  const resultsEl = document.getElementById('reco-picker-results');
+  const pool = [...films, ...series, ...anime];
+  const q = query.toLowerCase().trim();
+  const filtered = (q ? pool.filter(i => i.title.toLowerCase().includes(q)) : pool)
+    .slice(0, 10);
+
+  if (!filtered.length) {
+    resultsEl.innerHTML = '<p class="tmdb-msg">Aucun résultat.</p>';
+    return;
+  }
+
+  resultsEl.innerHTML = '';
+  filtered.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'reco-picker-card';
+    card.innerHTML = `
+      ${item.poster ? `<img src="${item.poster}" alt="" />` : `<div class="reco-picker-card-no-poster"></div>`}
+      <div class="reco-picker-card-info">
+        <p class="reco-picker-card-title">${item.title}</p>
+        <p class="reco-picker-card-year">${item.year || ''}</p>
+      </div>
+    `;
+    card.addEventListener('click', async () => {
+      recommendations[_recoPickerSlot] = { title: item.title, poster: item.poster || null, year: item.year || null };
+      document.getElementById('reco-picker-modal').classList.add('hidden');
+      await saveRecommendations();
+      fillRecoSection();
+    });
+    resultsEl.appendChild(card);
+  });
+}
+
+async function saveRecommendations() {
+  if (!currentUser) return;
+  await db.ref(`users/${currentUser.uid}/recommendations`).set(recommendations);
+}
+
+document.getElementById('reco-picker-close').addEventListener('click', () => {
+  document.getElementById('reco-picker-modal').classList.add('hidden');
+});
+document.getElementById('reco-search-input').addEventListener('input', e => {
+  renderRecoPickerResults(e.target.value);
+});
+document.getElementById('reco-picker-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('reco-picker-modal')) {
+    document.getElementById('reco-picker-modal').classList.add('hidden');
+  }
+});
 
 function fillCommunityStrip() {
   const strip = document.getElementById('home-strip-community');
@@ -1222,6 +1427,8 @@ function sortData(data) {
       const diff = getStars(a.title) - getStars(b.title);
       return diff !== 0 ? diff : (b.year ?? 0) - (a.year ?? 0);
     }
+    if (currentSort === "added-desc") return (b.addedAt ?? '').localeCompare(a.addedAt ?? '');
+    if (currentSort === "added-asc")  return (a.addedAt ?? '').localeCompare(b.addedAt ?? '');
   });
 }
 
@@ -1341,7 +1548,7 @@ function createCardWrapper(item, index) {
   if (rating !== 0) {
     const starsDiv = document.createElement('div');
     starsDiv.className = 'card-stars';
-    starsDiv.textContent = `${rating}`;
+    starsDiv.innerHTML = `<span class="card-stars-icon"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>${rating}`;
     a.appendChild(starsDiv);
   }
 
@@ -1355,16 +1562,12 @@ function createCardWrapper(item, index) {
 }
 
 function applyGridPagination() {
+  grid.querySelectorAll('.ghost-card').forEach(g => g.remove());
   const cards = Array.from(grid.querySelectorAll('.card-wrapper'));
   if (cards.length === 0) { updateLoadMoreBtn(0, 0); return; }
 
-  const firstTop = cards[0].offsetTop;
-  let cols = 0;
-  for (let i = 0; i < cards.length; i++) {
-    if (cards[i].offsetTop !== firstTop) break;
-    cols++;
-  }
-  if (cols === 0) cols = 1;
+  const computedCols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+  let cols = computedCols || 1;
   gridColCount = cols;
 
   const limit = GRID_ROWS_PER_PAGE * cols;
@@ -1372,7 +1575,17 @@ function applyGridPagination() {
     cards[i].remove();
   }
 
-  updateLoadMoreBtn(currentRenderData.length, Math.min(limit, cards.length));
+  const shown = Math.min(limit, cards.length);
+  if (currentRenderData.length <= limit) {
+    const ghostCount = limit - shown;
+    for (let i = 0; i < ghostCount; i++) {
+      const ghost = document.createElement('div');
+      ghost.className = 'card-wrapper ghost-card';
+      grid.appendChild(ghost);
+    }
+  }
+
+  updateLoadMoreBtn(currentRenderData.length, shown);
 }
 
 function updateLoadMoreBtn(total, shown) {
@@ -1660,6 +1873,31 @@ function openModal(item, triggerEl) {
     copyBtn.onclick = () => copyItemToMyList(item, copyBtn);
   }
 
+  const watchlistBtn = document.getElementById('modal-watchlist-btn');
+  watchlistBtn.classList.add('hidden');
+  watchlistBtn.classList.remove('copied');
+  if (isGuest && !isWatchlistItem && currentUser) {
+    db.ref(`users/${currentUser.uid}`).once('value').then(snap => {
+      const d = snap.val() || {};
+      const myLists = [
+        ...Object.values(d.films  || {}),
+        ...Object.values(d.series || {}),
+        ...Object.values(d.anime  || {}),
+      ];
+      const myWatchlist = Object.values(d.watchlist || {});
+      const inLists     = myLists.some(i => i.title === item.title);
+      const inWatchlist = myWatchlist.some(i => i.title === item.title);
+
+      if (inLists) copyBtn.classList.add('hidden');
+
+      if (!inLists && !inWatchlist) {
+        watchlistBtn.classList.remove('hidden');
+        watchlistBtn.textContent = 'Ajouter à ma Watchlist';
+        watchlistBtn.onclick = () => addToMyWatchlist(item, watchlistBtn);
+      }
+    });
+  }
+
   const transferActions = document.getElementById('modal-transfer-actions');
   const isOwnWatchlist = !isGuest && isWatchlistItem;
   transferActions.classList.toggle('hidden', !isOwnWatchlist);
@@ -1738,6 +1976,24 @@ posterZoomWrap.addEventListener('pointermove', e => {
 posterZoomWrap.addEventListener('click', e => e.stopPropagation());
 posterZoomImg.addEventListener('dragstart', e => e.preventDefault());
 
+async function addToMyWatchlist(item, btn) {
+  if (!currentUser) return;
+  const snap = await db.ref(`users/${currentUser.uid}/watchlist`).once('value');
+  const existing = Object.values(snap.val() || {});
+  if (existing.find(i => i.title === item.title)) {
+    btn.textContent = 'Déjà dans ta Watchlist';
+    btn.classList.add('copied');
+    return;
+  }
+  const copy = { ...item };
+  delete copy.stars;
+  existing.push(copy);
+  await db.ref(`users/${currentUser.uid}/watchlist`).set(existing);
+  btn.textContent = '✓ Ajouté !';
+  btn.classList.add('copied');
+  btn.onclick = null;
+}
+
 async function copyItemToMyList(item, btn) {
   if (!currentUser) return;
   let arrName = 'films';
@@ -1772,6 +2028,7 @@ async function transferFromWatchlist(item, targetList) {
   if (!targetItems.find(i => i.title === item.title)) {
     const copy = { ...item };
     delete copy.stars;
+    copy.addedAt = new Date().toISOString();
     targetItems.push(copy);
     await db.ref(`users/${currentUser.uid}/${targetList}`).set(targetItems);
   }
@@ -1888,6 +2145,11 @@ function updateStatsSidebar() {
   const isWatchlist = currentTab === 'watchlist';
   const isSeries    = currentTab === 'series';
   const hideTopSections = isSeries || isWatchlist;
+  const isOwn = !currentUser || currentViewUid === currentUser.uid;
+
+  document.querySelectorAll('.sidebar-btn-group').forEach(el => {
+    el.style.display = isOwn ? '' : 'none';
+  });
 
   ['sidebar-section-ratings', 'sm-sidebar-section-ratings'].forEach(id => {
     const el = document.getElementById(id);
@@ -1962,12 +2224,14 @@ const sideMenuEl       = document.getElementById('side-menu');
 const sideMenuBackdrop = document.getElementById('side-menu-backdrop');
 
 const SORT_LABELS = {
-  'alpha-asc':  'A → Z',
-  'alpha-desc': 'Z → A',
-  'year-desc':  'Récent',
-  'year-asc':   'Ancien',
-  'stars-desc': 'Mieux notés',
-  'stars-asc':  'Moins notés',
+  'alpha-asc':   'A → Z',
+  'alpha-desc':  'Z → A',
+  'year-desc':   'Récent',
+  'year-asc':    'Ancien',
+  'added-desc':  'Ajouté récemment',
+  'added-asc':   'Ajouté anciennement',
+  'stars-desc':  'Mieux notés',
+  'stars-asc':   'Moins notés',
 };
 
 function openSideMenu() {
@@ -2392,6 +2656,7 @@ document.getElementById('entry-form').addEventListener('submit', e => {
       document.getElementById('entry-dup-error').classList.remove('hidden');
       return;
     }
+    entry.addedAt = new Date().toISOString();
     adminData[adminTab].push(entry);
   }
 
