@@ -21,8 +21,9 @@ firebase.initializeApp(FIREBASE_CONFIG);
 const db   = firebase.database();
 const auth = firebase.auth();
 
-let currentUser    = null;
-let currentViewUid = null;
+let currentUser     = null;
+let currentViewUid  = null;
+let currentViewName = '';
 
 let films     = [];
 let series    = [];
@@ -57,9 +58,211 @@ function refreshViews() {
   if (!homePage.classList.contains('hidden')) populateHomePage();
 }
 
+function findItemAndList(title) {
+  let item = films.find(i => i.title === title);
+  if (item) return { item, arr: films, arrName: 'films' };
+  item = series.find(i => i.title === title);
+  if (item) return { item, arr: series, arrName: 'series' };
+  item = anime.find(i => i.title === title);
+  if (item) return { item, arr: anime, arrName: 'anime' };
+  return null;
+}
+
+function getNote(title) {
+  return findItemAndList(title)?.item?.note || '';
+}
+
+async function setNote(title, note) {
+  if (!currentUser || currentViewUid !== currentUser.uid) return;
+  const found = findItemAndList(title);
+  if (!found) return;
+  const { item, arr, arrName } = found;
+  if (note.trim()) item.note = note.trim();
+  else delete item.note;
+  await db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
+}
+
+// ── Note modal ────────────────────────────────────────────────
+let _noteTitleTarget = '';
+
+function updateModalNoteDisplay(title) {
+  const note        = getNote(title);
+  const noteBtn     = document.getElementById('modal-note-btn');
+  const noteExisting = document.getElementById('modal-note-existing');
+  const noteDisplay = document.getElementById('modal-note-display');
+  if (!noteBtn || !noteExisting || !noteDisplay) return;
+  if (note) {
+    noteBtn.classList.add('hidden');
+    noteDisplay.textContent = note;
+    noteExisting.classList.remove('hidden');
+  } else {
+    noteBtn.classList.remove('hidden');
+    noteExisting.classList.add('hidden');
+  }
+}
+
+function openNoteModal(title) {
+  _noteTitleTarget = title;
+  const textarea = document.getElementById('note-modal-textarea');
+  const count    = document.getElementById('note-modal-count');
+  textarea.value = getNote(title);
+  count.textContent = `${textarea.value.length} / 200`;
+  document.getElementById('note-modal').classList.remove('hidden');
+  textarea.focus();
+}
+
+function openNoteReadModal(title, note) {
+  document.getElementById('note-read-title').textContent = title;
+  document.getElementById('note-read-body').textContent = note;
+  const modal = document.getElementById('note-read-modal');
+  modal.classList.remove('hidden', 'closing');
+}
+function closeNoteReadModal() {
+  const modal = document.getElementById('note-read-modal');
+  modal.classList.add('closing');
+  modal.addEventListener('animationend', () => {
+    modal.classList.add('hidden');
+    modal.classList.remove('closing');
+  }, { once: true });
+}
+document.getElementById('note-read-close').addEventListener('click', closeNoteReadModal);
+document.getElementById('note-read-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('note-read-modal')) closeNoteReadModal();
+});
+
+document.getElementById('note-modal-close').addEventListener('click', () => {
+  document.getElementById('note-modal').classList.add('hidden');
+});
+document.getElementById('note-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('note-modal'))
+    document.getElementById('note-modal').classList.add('hidden');
+});
+document.getElementById('note-modal-textarea').addEventListener('input', e => {
+  document.getElementById('note-modal-count').textContent = `${e.target.value.length} / 200`;
+});
+document.getElementById('note-modal-save').addEventListener('click', async () => {
+  const note = document.getElementById('note-modal-textarea').value;
+  await setNote(_noteTitleTarget, note);
+  document.getElementById('note-modal').classList.add('hidden');
+  updateModalNoteDisplay(_noteTitleTarget);
+});
+
 function setRating(title, stars) {
   if (!currentUser || currentViewUid !== currentUser.uid) return;
+  const found = findItemAndList(title);
+  if (!found) return;
+  const { item, arr, arrName } = found;
+  if (stars === 0) delete item.stars;
+  else item.stars = stars;
+  db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
+  refreshViews();
+}
 
+let currentRecFilm   = null;
+let currentRecSeries = null;
+
+// ── Emojis ───────────────────────────────────────────────────
+const EMOJI_CATEGORIES = [
+  { label: 'Joie', emojis: [
+    'Slightly smiling face', 'Smiling face with smiling eyes',
+    'Smiling face with tear', 'Face holding back tears',
+  ]},
+  { label: 'Rire', emojis: [
+    'Grinning face', 'Grinning squinting face', 'Rolling on the floor laughing', 'Zany face',
+  ]},
+  { label: 'Amour', emojis: [
+    'Smiling face with heart-eyes', 'Smiling face with hearts',
+    'Star-struck', 'Smiling face with open hands',
+  ]},
+  { label: 'Choc', emojis: [
+    'Exploding head', 'Flushed face',
+    'Face with open eyes and hand over mouth', 'Face with open mouth',
+  ]},
+  { label: 'Tristesse', emojis: [
+    'Pleading face', 'Disappointed face', 'Sad but relieved face',
+    'Loudly crying face',
+  ]},
+  { label: 'Ennui', emojis: [
+    'Expressionless face', 'Yawning face',
+    'Unamused face', 'Face with rolling eyes',
+  ]},
+  { label: 'Dégoût', emojis: [
+    'Face vomiting', 'Pile of poo',
+  ]},
+  { label: 'Colère', emojis: [
+    'Face with steam from nose', 'Pouting face', 'Face with symbols on mouth',
+    'Face with raised eyebrow',
+  ]},
+  { label: 'Plus', emojis: [
+    'Hot face', 'Face with peeking eye', 'Thinking face',
+  ]},
+];
+
+let _emojiPickerTitle = '';
+let _emojiPickerSelected = [];
+
+function getEmojis(title) {
+  const item = [...films, ...series, ...anime].find(i => i.title === title);
+  return item?.emojis || [];
+}
+
+function openEmojiPicker(title) {
+  _emojiPickerTitle    = title;
+  _emojiPickerSelected = [...getEmojis(title)];
+  renderEmojiPicker();
+  document.getElementById('emoji-picker-modal').classList.remove('hidden');
+}
+
+function renderEmojiPicker() {
+  const body      = document.getElementById('emoji-picker-body');
+  const selEl     = document.getElementById('emoji-picker-selection');
+  const hintEl    = document.getElementById('emoji-picker-hint');
+  const remaining = 3 - _emojiPickerSelected.length;
+  hintEl.textContent = remaining > 0
+    ? `Choisis jusqu'à ${remaining} emoji${remaining > 1 ? 's' : ''} de plus`
+    : 'Maximum atteint (3)';
+
+  body.innerHTML = '';
+  EMOJI_CATEGORIES.forEach(cat => {
+    const section = document.createElement('div');
+    section.className = 'emoji-cat-section';
+    const label = document.createElement('p');
+    label.className = 'emoji-cat-label';
+    label.textContent = cat.label;
+    section.appendChild(label);
+    const grid = document.createElement('div');
+    grid.className = 'emoji-cat-grid';
+    cat.emojis.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'emoji-item' + (_emojiPickerSelected.includes(name) ? ' selected' : '');
+      btn.innerHTML = `<img src="medias/${name}.png" alt="${name}" title="${name}" />`;
+      btn.addEventListener('click', () => {
+        if (_emojiPickerSelected.includes(name)) {
+          _emojiPickerSelected = _emojiPickerSelected.filter(e => e !== name);
+        } else if (_emojiPickerSelected.length < 3) {
+          _emojiPickerSelected.push(name);
+        }
+        renderEmojiPicker();
+      });
+      grid.appendChild(btn);
+    });
+    section.appendChild(grid);
+    body.appendChild(section);
+  });
+
+  selEl.innerHTML = '';
+  _emojiPickerSelected.forEach(name => {
+    const img = document.createElement('img');
+    img.src = `medias/${name}.png`;
+    img.alt = name;
+    img.className = 'emoji-selected-item';
+    selEl.appendChild(img);
+  });
+}
+
+async function saveEmojis() {
+  if (!currentUser || currentViewUid !== currentUser.uid) return;
+  const title = _emojiPickerTitle;
   let arr, arrName;
   let item = films.find(i => i.title === title);
   if (item) { arr = films; arrName = 'films'; }
@@ -72,16 +275,48 @@ function setRating(title, stars) {
     }
   }
   if (!item) return;
-
-  if (stars === 0) delete item.stars;
-  else item.stars = stars;
-
-  db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
+  if (_emojiPickerSelected.length) item.emojis = [..._emojiPickerSelected];
+  else delete item.emojis;
+  await db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
+  updateModalEmojiDisplay(title);
   refreshViews();
 }
 
-let currentRecFilm   = null;
-let currentRecSeries = null;
+function updateModalEmojiDisplay(title) {
+  const emojis = getEmojis(title);
+  const selEl  = document.getElementById('modal-emoji-selected');
+  const btnEl  = document.getElementById('modal-emoji-btn');
+  if (!selEl || !btnEl) return;
+  selEl.innerHTML = '';
+  emojis.forEach(name => {
+    const img = document.createElement('img');
+    img.src = `medias/${name}.png`;
+    img.alt = name;
+    img.className = 'modal-emoji-chip';
+    selEl.appendChild(img);
+  });
+  if (emojis.length) {
+    btnEl.style.display = 'none';
+    selEl.style.cursor = 'pointer';
+    selEl.onclick = () => openEmojiPicker(title);
+  } else {
+    btnEl.style.display = '';
+    selEl.style.cursor = '';
+    selEl.onclick = null;
+  }
+}
+
+document.getElementById('emoji-picker-close').addEventListener('click', () => {
+  document.getElementById('emoji-picker-modal').classList.add('hidden');
+});
+document.getElementById('emoji-picker-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('emoji-picker-modal'))
+    document.getElementById('emoji-picker-modal').classList.add('hidden');
+});
+document.getElementById('emoji-picker-save').addEventListener('click', async () => {
+  await saveEmojis();
+  document.getElementById('emoji-picker-modal').classList.add('hidden');
+});
 
 function loadUserData(uid) {
   _dataReady = false;
@@ -97,6 +332,7 @@ function loadUserData(uid) {
     recommendations = { films: toSlots(rec.films), series: toSlots(rec.series) };
     currentRecFilm   = d.recommendationFilm   || null;
     currentRecSeries = d.recommendationSeries || null;
+    currentViewName  = d.name || '';
     _dataReady = true;
     loadDisplayPrefs(uid);
     buildGenreFilters(currentTab === 'films' ? films : currentTab === 'watchlist' ? watchlist : [...series, ...anime]);
@@ -838,7 +1074,7 @@ function populateHomePage() {
   fillActivitySection();
   fillRecoSection();
 
-  const setBadge = (id, count) => { const el = document.getElementById(id); if (el) el.textContent = count > 0 ? count : ''; };
+  const setBadge = (id, count) => { const el = document.getElementById(id); if (el) el.textContent = count; };
   setBadge('home-badge-films',     films.length);
   setBadge('home-badge-series',    series.length + anime.length);
   setBadge('home-badge-watchlist', watchlist.length);
@@ -956,11 +1192,6 @@ function buildRecoSlots(container, type, isOwn) {
   const group = document.createElement('div');
   group.className = 'reco-group';
 
-  const label = document.createElement('p');
-  label.className = 'reco-group-label';
-  label.textContent = type === 'films' ? 'Films' : 'Séries';
-  group.appendChild(label);
-
   const slots = document.createElement('div');
   slots.className = 'reco-slots-row';
 
@@ -996,7 +1227,36 @@ function buildRecoSlots(container, type, isOwn) {
       slot.innerHTML = `<span class="reco-empty-label">—</span>`;
     }
 
-    slots.appendChild(slot);
+    const wrap = document.createElement('div');
+    wrap.className = 'reco-slot-wrap';
+    wrap.appendChild(slot);
+
+    if (item) {
+      const note = getNote(item.title);
+      if (note) {
+        const noteEl = document.createElement('div');
+        noteEl.className = 'reco-slot-note';
+        noteEl.style.cursor = 'pointer';
+        noteEl.addEventListener('click', e => {
+          e.stopPropagation();
+          openNoteReadModal(item.title, note);
+        });
+        const stars = getStars(item.title);
+        if (stars) {
+          const starsEl = document.createElement('p');
+          starsEl.className = 'reco-slot-note-stars';
+          starsEl.textContent = '★ ' + stars + ' / 10';
+          noteEl.appendChild(starsEl);
+        }
+        const textEl = document.createElement('p');
+        textEl.className = 'reco-slot-note-text';
+        textEl.textContent = note;
+        noteEl.appendChild(textEl);
+        wrap.appendChild(noteEl);
+      }
+    }
+
+    slots.appendChild(wrap);
   }
 
   group.appendChild(slots);
@@ -1010,8 +1270,7 @@ function fillRecoSection() {
 
   const titleEl = document.querySelector('#home-section-reco .home-carousel-title');
   if (titleEl) {
-    const name = document.getElementById('home-app-title')?.textContent || '';
-    titleEl.textContent = name ? `Recommandations de ${name}` : 'Recommandations';
+    titleEl.textContent = currentViewName ? `Recommandations de ${currentViewName}` : 'Recommandations';
   }
 
   container.innerHTML = '';
@@ -1880,6 +2139,27 @@ function openModal(item, triggerEl) {
   // Stars / rating: hide for watchlist (not yet seen)
   starsEl.style.display = isWatchlistItem ? 'none' : '';
   if (ratingLabel) ratingLabel.style.display = isWatchlistItem ? 'none' : '';
+
+  const emojiRow = document.getElementById('modal-emoji-row');
+  const emojiBtn = document.getElementById('modal-emoji-btn');
+  const isOwn    = currentUser && currentViewUid === currentUser.uid;
+  if (emojiRow) emojiRow.style.display = (!isWatchlistItem && isOwn) ? '' : 'none';
+  if (emojiBtn) {
+    emojiBtn.onclick = () => openEmojiPicker(item.title);
+  }
+  updateModalEmojiDisplay(item.title);
+
+  const noteBtn      = document.getElementById('modal-note-btn');
+  const noteExisting = document.getElementById('modal-note-existing');
+  const noteEditBtn  = document.getElementById('modal-note-edit-btn');
+  const reviewCard   = document.getElementById('modal-review-card');
+  if (noteBtn) {
+    noteBtn.style.display      = isOwn ? '' : 'none';
+    if (noteExisting) noteExisting.style.display = isOwn ? '' : 'none';
+    noteBtn.onclick    = () => openNoteModal(item.title);
+    if (noteEditBtn) noteEditBtn.onclick = () => openNoteModal(item.title);
+    updateModalNoteDisplay(item.title);
+  }
 
   updateModalRecommendBtn(item.title);
 
@@ -2979,7 +3259,6 @@ document.getElementById('import-done-btn').addEventListener('click', () => {
 });
 
 // ── Fetch Trailers ────────────────────────────────────────────
-document.getElementById('admin-fetch-trailers-btn').addEventListener('click', runFetchTrailers);
 
 async function runFetchTrailers() {
   if (!currentUser) return;
