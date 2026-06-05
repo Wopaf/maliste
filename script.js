@@ -29,7 +29,7 @@ let films     = [];
 let series    = [];
 let anime     = [];
 let watchlist = [];
-let recommendations = { films: [null, null, null], series: [null, null, null] };
+let recommendations = [null, null, null, null, null, null];
 let _dataReady = false;
 
 let currentRenderData = [];
@@ -76,10 +76,15 @@ async function setNote(title, note) {
   if (!currentUser || currentViewUid !== currentUser.uid) return;
   const found = findItemAndList(title);
   if (!found) return;
-  const { item, arr, arrName } = found;
-  if (note.trim()) item.note = note.trim();
-  else delete item.note;
-  await db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
+  const { item, arrName } = found;
+  const key = catalogKey(title);
+  if (note.trim()) {
+    item.note = note.trim();
+    await db.ref(`users/${currentUser.uid}/${arrName}/${key}/note`).set(note.trim());
+  } else {
+    delete item.note;
+    await db.ref(`users/${currentUser.uid}/${arrName}/${key}/note`).remove();
+  }
 }
 
 // ── Note modal ────────────────────────────────────────────────
@@ -151,10 +156,15 @@ function setRating(title, stars) {
   if (!currentUser || currentViewUid !== currentUser.uid) return;
   const found = findItemAndList(title);
   if (!found) return;
-  const { item, arr, arrName } = found;
-  if (stars === 0) delete item.stars;
-  else item.stars = stars;
-  db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
+  const { item, arrName } = found;
+  const key = catalogKey(title);
+  if (stars === 0) {
+    delete item.stars;
+    db.ref(`users/${currentUser.uid}/${arrName}/${key}/stars`).remove();
+  } else {
+    item.stars = stars;
+    db.ref(`users/${currentUser.uid}/${arrName}/${key}/stars`).set(stars);
+  }
   refreshViews();
 }
 
@@ -162,184 +172,60 @@ let currentRecFilm   = null;
 let currentRecSeries = null;
 
 // ── Emojis ───────────────────────────────────────────────────
-const EMOJI_CATEGORIES = [
-  { label: 'Joie', emojis: [
-    'Slightly smiling face', 'Smiling face with smiling eyes',
-    'Smiling face with tear', 'Face holding back tears',
-  ]},
-  { label: 'Rire', emojis: [
-    'Grinning face', 'Grinning squinting face', 'Rolling on the floor laughing', 'Zany face',
-  ]},
-  { label: 'Amour', emojis: [
-    'Smiling face with heart-eyes', 'Smiling face with hearts',
-    'Star-struck', 'Smiling face with open hands',
-  ]},
-  { label: 'Choc', emojis: [
-    'Exploding head', 'Flushed face',
-    'Face with open eyes and hand over mouth', 'Face with open mouth',
-  ]},
-  { label: 'Tristesse', emojis: [
-    'Pleading face', 'Disappointed face', 'Sad but relieved face',
-    'Loudly crying face',
-  ]},
-  { label: 'Ennui', emojis: [
-    'Expressionless face', 'Yawning face',
-    'Unamused face', 'Face with rolling eyes',
-  ]},
-  { label: 'Dégoût', emojis: [
-    'Face vomiting', 'Pile of poo',
-  ]},
-  { label: 'Colère', emojis: [
-    'Face with steam from nose', 'Pouting face', 'Face with symbols on mouth',
-    'Face with raised eyebrow',
-  ]},
-  { label: 'Plus', emojis: [
-    'Hot face', 'Face with peeking eye', 'Thinking face',
-  ]},
-];
 
-let _emojiPickerTitle = '';
-let _emojiPickerSelected = [];
-
-function getEmojis(title) {
-  const item = [...films, ...series, ...anime].find(i => i.title === title);
-  return item?.emojis || [];
-}
-
-function openEmojiPicker(title) {
-  _emojiPickerTitle    = title;
-  _emojiPickerSelected = [...getEmojis(title)];
-  renderEmojiPicker();
-  document.getElementById('emoji-picker-modal').classList.remove('hidden');
-}
-
-function renderEmojiPicker() {
-  const body      = document.getElementById('emoji-picker-body');
-  const selEl     = document.getElementById('emoji-picker-selection');
-  const hintEl    = document.getElementById('emoji-picker-hint');
-  const remaining = 3 - _emojiPickerSelected.length;
-  hintEl.textContent = remaining > 0
-    ? `Choisis jusqu'à ${remaining} emoji${remaining > 1 ? 's' : ''} de plus`
-    : 'Maximum atteint (3)';
-
-  body.innerHTML = '';
-  EMOJI_CATEGORIES.forEach(cat => {
-    const section = document.createElement('div');
-    section.className = 'emoji-cat-section';
-    const label = document.createElement('p');
-    label.className = 'emoji-cat-label';
-    label.textContent = cat.label;
-    section.appendChild(label);
-    const grid = document.createElement('div');
-    grid.className = 'emoji-cat-grid';
-    cat.emojis.forEach(name => {
-      const btn = document.createElement('button');
-      btn.className = 'emoji-item' + (_emojiPickerSelected.includes(name) ? ' selected' : '');
-      btn.innerHTML = `<img src="medias/${name}.png" alt="${name}" title="${name}" />`;
-      btn.addEventListener('click', () => {
-        if (_emojiPickerSelected.includes(name)) {
-          _emojiPickerSelected = _emojiPickerSelected.filter(e => e !== name);
-        } else if (_emojiPickerSelected.length < 3) {
-          _emojiPickerSelected.push(name);
-        }
-        renderEmojiPicker();
-      });
-      grid.appendChild(btn);
-    });
-    section.appendChild(grid);
-    body.appendChild(section);
-  });
-
-  selEl.innerHTML = '';
-  _emojiPickerSelected.forEach(name => {
-    const img = document.createElement('img');
-    img.src = `medias/${name}.png`;
-    img.alt = name;
-    img.className = 'emoji-selected-item';
-    selEl.appendChild(img);
-  });
-}
-
-async function saveEmojis() {
-  if (!currentUser || currentViewUid !== currentUser.uid) return;
-  const title = _emojiPickerTitle;
-  let arr, arrName;
-  let item = films.find(i => i.title === title);
-  if (item) { arr = films; arrName = 'films'; }
-  else {
-    item = series.find(i => i.title === title);
-    if (item) { arr = series; arrName = 'series'; }
-    else {
-      item = anime.find(i => i.title === title);
-      if (item) { arr = anime; arrName = 'anime'; }
-    }
-  }
-  if (!item) return;
-  if (_emojiPickerSelected.length) item.emojis = [..._emojiPickerSelected];
-  else delete item.emojis;
-  await db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
-  updateModalEmojiDisplay(title);
-  refreshViews();
-}
-
-function updateModalEmojiDisplay(title) {
-  const emojis = getEmojis(title);
-  const selEl  = document.getElementById('modal-emoji-selected');
-  const btnEl  = document.getElementById('modal-emoji-btn');
-  if (!selEl || !btnEl) return;
-  selEl.innerHTML = '';
-  emojis.forEach(name => {
-    const img = document.createElement('img');
-    img.src = `medias/${name}.png`;
-    img.alt = name;
-    img.className = 'modal-emoji-chip';
-    selEl.appendChild(img);
-  });
-  if (emojis.length) {
-    btnEl.style.display = 'none';
-    selEl.style.cursor = 'pointer';
-    selEl.onclick = () => openEmojiPicker(title);
-  } else {
-    btnEl.style.display = '';
-    selEl.style.cursor = '';
-    selEl.onclick = null;
-  }
-}
-
-document.getElementById('emoji-picker-close').addEventListener('click', () => {
-  document.getElementById('emoji-picker-modal').classList.add('hidden');
-});
-document.getElementById('emoji-picker-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('emoji-picker-modal'))
-    document.getElementById('emoji-picker-modal').classList.add('hidden');
-});
-document.getElementById('emoji-picker-save').addEventListener('click', async () => {
-  await saveEmojis();
-  document.getElementById('emoji-picker-modal').classList.add('hidden');
-});
-
-function loadUserData(uid) {
+async function loadUserData(uid) {
   _dataReady = false;
-  films = []; series = []; anime = [];
-  db.ref(`users/${uid}`).once('value', snap => {
-    const d = snap.val() || {};
-    films          = Object.values(d.films     || {});
-    series         = Object.values(d.series    || {});
-    anime          = Object.values(d.anime     || {});
-    watchlist      = Object.values(d.watchlist || {});
-    const rec = d.recommendations || {};
-    const toSlots = (arr) => { const a = Array.isArray(arr) ? arr : Object.values(arr || {}); return [...a, null, null, null].slice(0, 3); };
-    recommendations = { films: toSlots(rec.films), series: toSlots(rec.series) };
-    currentRecFilm   = d.recommendationFilm   || null;
-    currentRecSeries = d.recommendationSeries || null;
-    currentViewName  = d.name || '';
-    _dataReady = true;
-    loadDisplayPrefs(uid);
-    buildGenreFilters(currentTab === 'films' ? films : currentTab === 'watchlist' ? watchlist : [...series, ...anime]);
-    renderRecommendation();
-    if (!homePage.classList.contains('hidden')) populateHomePage();
-    _tryRender();
+  films = []; series = []; anime = []; watchlist = [];
+
+  const [userSnap, catFilmsSnap, catSeriesSnap, catAnimeSnap, catPeopleSnap] = await Promise.all([
+    db.ref(`users/${uid}`).once('value'),
+    db.ref('catalog/films').once('value'),
+    db.ref('catalog/series').once('value'),
+    db.ref('catalog/anime').once('value'),
+    db.ref('catalog/people').once('value'),
+  ]);
+
+  const d = userSnap.val() || {};
+  catalogCache = {
+    films:  catFilmsSnap.val()  || {},
+    series: catSeriesSnap.val() || {},
+    anime:  catAnimeSnap.val()  || {},
+    people: catPeopleSnap.val() || {},
+  };
+
+  const merge = (userItems, catType) =>
+    userItems.map(u => ({ ...(catalogCache[catType][catalogKey(u.title)] || {}), ...u }));
+
+  const userFilms     = Object.values(d.films     || {});
+  const userSeries    = Object.values(d.series    || {});
+  const userAnime     = Object.values(d.anime     || {});
+  const userWatchlist = Object.values(d.watchlist || {});
+
+  films     = merge(userFilms,     'films');
+  series    = merge(userSeries,    'series');
+  anime     = merge(userAnime,     'anime');
+  watchlist = userWatchlist.map(u => {
+    const key = catalogKey(u.title);
+    const cat = catalogCache.films[key] || catalogCache.series[key] || catalogCache.anime[key] || {};
+    return { ...cat, ...u };
   });
+
+  const rec = d.recommendations || {};
+  if (Array.isArray(rec)) {
+    recommendations = [...rec, null, null, null, null, null, null].slice(0, 6);
+  } else {
+    const toArr = v => { const a = Array.isArray(v) ? v : Object.values(v || {}); return [...a, null, null, null].slice(0, 3); };
+    recommendations = [...toArr(rec.films), ...toArr(rec.series)];
+  }
+  currentRecFilm   = d.recommendationFilm   || null;
+  currentRecSeries = d.recommendationSeries || null;
+  currentViewName  = d.name || '';
+  _dataReady = true;
+  loadDisplayPrefs(uid);
+  buildGenreFilters(currentTab === 'films' ? films : currentTab === 'watchlist' ? watchlist : [...series, ...anime]);
+  renderRecommendation();
+  if (!homePage.classList.contains('hidden')) populateHomePage();
+  _tryRender();
 }
 
 async function setRecommendation(title, type) {
@@ -925,6 +811,8 @@ document.getElementById('back-my-list-btn').addEventListener('click', () => {
   if (!currentUser) return;
   if (searchInput.value) searchClear.click();
   switchToUser(currentUser.uid);
+  restoreOwnHomeHeader();
+  showHomePage();
 });
 
 document.getElementById('home-back-btn').addEventListener('click', () => {
@@ -1073,6 +961,7 @@ function populateHomePage() {
   fillCommunityStrip();
   fillActivitySection();
   fillRecoSection();
+  showMigrateSection();
 
   const setBadge = (id, count) => { const el = document.getElementById(id); if (el) el.textContent = count; };
   setBadge('home-badge-films',     films.length);
@@ -1103,6 +992,300 @@ function populateHomePage() {
       <div class="home-stat"><strong>${wc}</strong><span>Watchlist</span></div>
     `;
   }
+}
+
+// ── Migration vers le catalogue partagé ──────────────────────
+const CATALOG_SHARED_FIELDS = [
+  'title','poster','backdrop','director','cast','url','youtubeId',
+  'episodes','seasons','duration','time','genre','year','type',
+  'tmdbId','tmdbType'
+];
+const PERSONAL_FIELDS = ['title','stars','note','addedAt'];
+
+let catalogCache = { films: {}, series: {}, anime: {}, people: {} };
+
+function extractPersonalFields(item) {
+  const out = {};
+  PERSONAL_FIELDS.forEach(f => { if (item[f] !== undefined) out[f] = item[f]; });
+  return out;
+}
+
+function catalogKey(title) {
+  return title.replace(/[.#$[\]/]/g, '_');
+}
+
+function extractSharedFields(item) {
+  const shared = {};
+  CATALOG_SHARED_FIELDS.forEach(f => { if (item[f] !== undefined) shared[f] = item[f]; });
+  return shared;
+}
+
+async function migrateDataToCatalog() {
+  const btn    = document.getElementById('home-migrate-btn');
+  const status = document.getElementById('home-migrate-status');
+  btn.disabled = true;
+  btn.textContent = 'Migration en cours…';
+  status.classList.remove('hidden');
+  status.textContent = '';
+
+  const lists = [
+    { arr: films,     type: 'films'  },
+    { arr: series,    type: 'series' },
+    { arr: anime,     type: 'anime'  },
+    { arr: watchlist, type: 'films'  },
+  ];
+
+  let written = 0, skipped = 0;
+  const catalogRef = db.ref('catalog');
+
+  for (const { arr, type } of lists) {
+    for (const item of arr) {
+      if (!item.title) continue;
+      const key      = catalogKey(item.title);
+      const snap     = await catalogRef.child(`${type}/${key}`).once('value');
+      const existing = snap.val();
+      const shared   = extractSharedFields(item);
+      await catalogRef.child(`${type}/${key}`).update(shared);
+      written++;
+      status.textContent = `${written} mis à jour…`;
+    }
+  }
+
+  status.textContent = `✓ Migration terminée — ${written} entrées mises à jour dans le catalogue.`;
+  btn.textContent    = 'Migration terminée';
+}
+
+document.getElementById('home-migrate-btn').addEventListener('click', migrateDataToCatalog);
+
+async function migrateAllUsersToCatalog() {
+  const btn    = document.getElementById('home-migrate-all-btn');
+  const status = document.getElementById('home-migrate-status');
+  btn.disabled = true;
+  btn.textContent = 'Migration en cours…';
+  status.classList.remove('hidden');
+  status.textContent = '';
+
+  const profilesSnap = await db.ref('profiles').once('value');
+  const profiles = profilesSnap.val() || {};
+  const uids = Object.keys(profiles);
+
+  let written = 0, usersProcessed = 0;
+  const catalogRef = db.ref('catalog');
+  const listNames  = ['films', 'series', 'anime'];
+
+  for (const uid of uids) {
+    usersProcessed++;
+    status.textContent = `Utilisateur ${usersProcessed}/${uids.length}… (${written} entrées mises à jour)`;
+
+    for (const listName of listNames) {
+      const snap = await db.ref(`users/${uid}/${listName}`).once('value');
+      const items = snap.val();
+      if (!items) continue;
+      const arr = Array.isArray(items) ? items : Object.values(items);
+
+      for (const item of arr) {
+        if (!item?.title) continue;
+        const key    = catalogKey(item.title);
+        const shared = extractSharedFields(item);
+        await catalogRef.child(`${listName}/${key}`).update(shared);
+        written++;
+      }
+    }
+  }
+
+  status.textContent = `✓ Terminé — ${usersProcessed} utilisateurs traités, ${written} entrées mises à jour.`;
+  btn.textContent    = 'Migration terminée';
+}
+
+document.getElementById('home-migrate-all-btn').addEventListener('click', migrateAllUsersToCatalog);
+
+async function slimDownMyData() {
+  const btn    = document.getElementById('home-slimdown-btn');
+  const status = document.getElementById('home-migrate-status');
+  btn.disabled = true;
+  btn.textContent = 'Slim down en cours…';
+  status.classList.remove('hidden');
+  status.textContent = '';
+
+  const listNames = ['films', 'series', 'anime', 'watchlist'];
+  const userUpdate = {};
+
+  for (const listName of listNames) {
+    const snap  = await db.ref(`users/${currentUser.uid}/${listName}`).once('value');
+    const items = Object.values(snap.val() || {});
+    const slimObj = {};
+    for (const item of items) {
+      if (!item?.title) continue;
+      slimObj[catalogKey(item.title)] = extractPersonalFields(item);
+    }
+    userUpdate[listName] = slimObj;
+  }
+
+  await db.ref(`users/${currentUser.uid}`).update(userUpdate);
+  status.textContent = '✓ Slim down terminé — données personnelles allégées et re-clées par titre.';
+  btn.textContent = 'Slim down terminé';
+}
+
+document.getElementById('home-slimdown-btn').addEventListener('click', slimDownMyData);
+
+async function restoreCatalogFromTmdb() {
+  const btn    = document.getElementById('home-restore-catalog-btn');
+  const status = document.getElementById('home-migrate-status');
+  btn.disabled = true;
+  status.classList.remove('hidden');
+
+  const listConfigs = [
+    { listName: 'films',     tmdbType: 'movie', searchType: 'movie' },
+    { listName: 'series',    tmdbType: 'tv',    searchType: 'tv'    },
+    { listName: 'anime',     tmdbType: 'tv',    searchType: 'tv'    },
+    { listName: 'watchlist', tmdbType: 'movie', searchType: 'multi' },
+  ];
+
+  let done = 0, failed = 0, total = 0;
+
+  // Collect all titles across all users
+  const profilesSnap = await db.ref('profiles').once('value');
+  const uids = Object.keys(profilesSnap.val() || {});
+
+  const tasks = [];
+  for (const uid of uids) {
+    const userSnap = await db.ref(`users/${uid}`).once('value');
+    const d = userSnap.val() || {};
+    for (const { listName, tmdbType, searchType } of listConfigs) {
+      const items = Object.values(d[listName] || {});
+      for (const item of items) {
+        if (!item?.title) continue;
+        tasks.push({ title: item.title, tmdbType, searchType, listName });
+      }
+    }
+  }
+
+  // Deduplicate by title
+  const seen  = new Set();
+  const uniq  = tasks.filter(t => { const k = t.title; if (seen.has(k)) return false; seen.add(k); return true; });
+  total = uniq.length;
+  status.textContent = `0 / ${total} titres traités…`;
+
+  for (const { title, tmdbType, searchType, listName } of uniq) {
+    try {
+      const endpoint = searchType === 'multi'
+        ? `/search/multi?query=${encodeURIComponent(title)}`
+        : `/search/${searchType}?query=${encodeURIComponent(title)}`;
+      const json    = await adminTmdbFetch(endpoint);
+      const results = (json.results || []).filter(r =>
+        searchType !== 'multi' || r.media_type === 'movie' || r.media_type === 'tv'
+      );
+      if (!results.length) { failed++; continue; }
+
+      const r       = results[0];
+      const isMov   = searchType === 'movie' || (searchType === 'multi' && r.media_type === 'movie');
+      const rType   = isMov ? 'movie' : 'tv';
+      const details = await adminTmdbFetch(`/${rType}/${r.id}?append_to_response=credits`);
+
+      const shared = { title };
+      shared.poster    = details.poster_path   ? `https://image.tmdb.org/t/p/w500${details.poster_path}`    : undefined;
+      shared.backdrop  = details.backdrop_path ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}` : undefined;
+      shared.tmdbId    = r.id;
+      shared.tmdbType  = rType;
+      shared.year     = isMov ? details.release_date?.slice(0, 4) : details.first_air_date?.slice(0, 4);
+      shared.genre    = (details.genres || []).slice(0, 2).map(g => adminTranslateGenre(g.name));
+      if (isMov) {
+        const dir = details.credits?.crew?.find(c => c.job === 'Director');
+        shared.director = dir?.name || '';
+        shared.cast     = (details.credits?.cast || []).slice(0, 8).map(c => c.name);
+        if (details.runtime) {
+          const h = Math.floor(details.runtime / 60);
+          const m = details.runtime % 60;
+          shared.time = m > 0 ? `${h}h${String(m).padStart(2,'0')}` : `${h}h`;
+        }
+      } else {
+        shared.episodes = details.number_of_episodes;
+        shared.seasons  = details.number_of_seasons;
+      }
+      const videosData = await adminTmdbFetchVideos(rType, r.id);
+      const trailer = (videosData.results || []).find(v => v.type === 'Trailer' && v.site === 'YouTube')
+                   || (videosData.results || []).find(v => v.site === 'YouTube');
+      if (trailer?.key) shared.youtubeId = trailer.key;
+
+      Object.keys(shared).forEach(k => shared[k] === undefined && delete shared[k]);
+
+      const catType = listName === 'watchlist' ? 'films' : listName;
+      await db.ref(`catalog/${catType}/${catalogKey(title)}`).update(shared);
+      done++;
+    } catch(e) {
+      failed++;
+    }
+    status.textContent = `${done + failed} / ${total} — ${done} restaurés, ${failed} échecs…`;
+    await new Promise(r => setTimeout(r, 260)); // respect rate limit TMDB
+  }
+
+  status.textContent = `✓ Restauration terminée — ${done} films restaurés, ${failed} non trouvés.`;
+  btn.textContent    = 'Restauration terminée';
+}
+
+document.getElementById('home-restore-catalog-btn').addEventListener('click', restoreCatalogFromTmdb);
+
+async function importPeopleFromTmdb() {
+  const btn    = document.getElementById('home-import-people-btn');
+  const status = document.getElementById('home-migrate-status');
+  btn.disabled = true;
+  status.classList.remove('hidden');
+  status.textContent = 'Lecture du catalogue…';
+
+  // Collecter tous les acteurs uniques du catalogue
+  const [cf, cs, ca] = await Promise.all([
+    db.ref('catalog/films').once('value'),
+    db.ref('catalog/series').once('value'),
+    db.ref('catalog/anime').once('value'),
+  ]);
+
+  const nameSet = new Set();
+  [cf, cs, ca].forEach(snap => {
+    Object.values(snap.val() || {}).forEach(item => {
+      (item.cast || []).forEach(name => { if (name) nameSet.add(name); });
+    });
+  });
+
+  const names = [...nameSet];
+  const total = names.length;
+  let done = 0, failed = 0;
+  status.textContent = `0 / ${total} acteurs traités…`;
+
+  for (const name of names) {
+    try {
+      const key      = catalogKey(name);
+      const existing = (await db.ref(`catalog/people/${key}`).once('value')).val();
+      if (existing?.profileImage) { done++; status.textContent = `${done + failed} / ${total}…`; continue; }
+
+      const json    = await adminTmdbFetch(`/search/person?query=${encodeURIComponent(name)}`);
+      const person  = (json.results || [])[0];
+      if (!person) { failed++; continue; }
+
+      await db.ref(`catalog/people/${key}`).set({
+        name,
+        tmdbId:       person.id,
+        profileImage: person.profile_path
+          ? `https://image.tmdb.org/t/p/w185${person.profile_path}`
+          : null,
+      });
+      done++;
+    } catch(e) {
+      failed++;
+    }
+    status.textContent = `${done + failed} / ${total} — ${done} importés, ${failed} échecs…`;
+    await new Promise(r => setTimeout(r, 260));
+  }
+
+  status.textContent = `✓ Terminé — ${done} acteurs importés, ${failed} non trouvés.`;
+  btn.textContent    = 'Import terminé';
+}
+
+document.getElementById('home-import-people-btn').addEventListener('click', importPeopleFromTmdb);
+
+function showMigrateSection() {
+  const section = document.getElementById('home-migrate-section');
+  const isOwn   = currentUser && currentViewUid === currentUser.uid;
+  if (section) section.classList.toggle('hidden', !isOwn);
 }
 
 function fillActivitySection() {
@@ -1186,17 +1369,16 @@ function fillActivitySection() {
 
 // ── Recommandations ──────────────────────────────────────────
 let _recoPickerSlot = null;
-let _recoPickerType = 'films';
 
-function buildRecoSlots(container, type, isOwn) {
+function buildRecoSlots(container, isOwn) {
   const group = document.createElement('div');
   group.className = 'reco-group';
 
   const slots = document.createElement('div');
   slots.className = 'reco-slots-row';
 
-  for (let i = 0; i < 3; i++) {
-    const item = recommendations[type][i];
+  for (let i = 0; i < 6; i++) {
+    const item = recommendations[i];
     const slot = document.createElement('div');
     slot.className = 'reco-slot' + (item ? ' reco-slot-filled' : ' reco-slot-ghost');
 
@@ -1214,15 +1396,15 @@ function buildRecoSlots(container, type, isOwn) {
       if (isOwn) {
         slot.querySelector('.reco-remove-btn').addEventListener('click', async e => {
           e.stopPropagation();
-          recommendations[type][i] = null;
+          recommendations[i] = null;
           await saveRecommendations();
           fillRecoSection();
         });
       }
     } else if (isOwn) {
-      slot.innerHTML = `<span class="reco-add-label">+</span>`;
+      slot.innerHTML = '';
       slot.style.cursor = 'pointer';
-      slot.addEventListener('click', () => openRecoPicker(i, type));
+      slot.addEventListener('click', () => openRecoPicker(i));
     } else {
       slot.innerHTML = `<span class="reco-empty-label">—</span>`;
     }
@@ -1274,13 +1456,11 @@ function fillRecoSection() {
   }
 
   container.innerHTML = '';
-  buildRecoSlots(container, 'films', isOwn);
-  buildRecoSlots(container, 'series', isOwn);
+  buildRecoSlots(container, isOwn);
 }
 
-function openRecoPicker(slotIndex, type) {
+function openRecoPicker(slotIndex) {
   _recoPickerSlot = slotIndex;
-  _recoPickerType = type;
   const modal = document.getElementById('reco-picker-modal');
   const input = document.getElementById('reco-search-input');
   modal.classList.remove('hidden');
@@ -1291,7 +1471,7 @@ function openRecoPicker(slotIndex, type) {
 
 function renderRecoPickerResults(query) {
   const resultsEl = document.getElementById('reco-picker-results');
-  const pool = _recoPickerType === 'films' ? films : [...series, ...anime];
+  const pool = [...films, ...series, ...anime];
   const q = query.toLowerCase().trim();
   const filtered = (q ? pool.filter(i => i.title.toLowerCase().includes(q)) : pool).slice(0, 10);
 
@@ -1309,7 +1489,7 @@ function renderRecoPickerResults(query) {
       </div>
     `;
     card.addEventListener('click', async () => {
-      recommendations[_recoPickerType][_recoPickerSlot] = { title: item.title, poster: item.poster || null, year: item.year || null };
+      recommendations[_recoPickerSlot] = { title: item.title, poster: item.poster || null, year: item.year || null };
       document.getElementById('reco-picker-modal').classList.add('hidden');
       await saveRecommendations();
       fillRecoSection();
@@ -2015,9 +2195,12 @@ function updatePersonBadge(query) {
     if (!matches.length) { section.style.display = 'none'; return; }
     section.style.display = '';
     for (const name of matches) {
+      const person = catalogCache.people[catalogKey(name)];
       const a = document.createElement('a');
       a.className = 'person-badge';
-      a.href = `https://www.google.com/search?q=${encodeURIComponent(name + ' allociné')}`;
+      a.href   = person?.tmdbId
+        ? `https://www.themoviedb.org/person/${person.tmdbId}`
+        : `https://www.google.com/search?q=${encodeURIComponent(name + ' site:themoviedb.org')}`;
       a.target = '_blank'; a.rel = 'noopener noreferrer';
       a.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>${name}`;
       wrap.appendChild(a);
@@ -2106,9 +2289,36 @@ function openModal(item, triggerEl) {
     dirEl.innerHTML = item.director
       ? `Réalisateur: ${personLink(item.director)}`
       : '';
-    castEl.innerHTML = item.cast && item.cast.length
-      ? `Casting: ${item.cast.map(personLink).join(' ')}`
-      : '';
+    if (item.cast && item.cast.length) {
+      castEl.innerHTML = '';
+      const wrap = document.createElement('div');
+      wrap.className = 'modal-cast-wrap';
+      const scroller = document.createElement('div');
+      scroller.className = 'modal-cast-scroller';
+      item.cast.forEach(name => {
+        const person = catalogCache.people[catalogKey(name)];
+        const badge  = document.createElement('a');
+        badge.className = 'modal-cast-badge';
+        if (person?.tmdbId) {
+          badge.href   = `https://www.themoviedb.org/person/${person.tmdbId}`;
+          badge.target = '_blank';
+          badge.rel    = 'noopener noreferrer';
+        }
+        badge.innerHTML = `
+          <div class="modal-cast-img-wrap">
+            ${person?.profileImage
+              ? `<img src="${person.profileImage}" alt="${name}" onerror="this.parentNode.innerHTML='<span class=\\'modal-cast-initials\\'>${name[0]}</span>'" />`
+              : `<span class="modal-cast-initials">${name[0]}</span>`}
+          </div>
+          <span class="modal-cast-name">${name}</span>
+        `;
+        scroller.appendChild(badge);
+      });
+      wrap.appendChild(scroller);
+      castEl.appendChild(wrap);
+    } else {
+      castEl.innerHTML = '';
+    }
   }
 
   document.querySelectorAll('.modal-person[data-search]').forEach(el => {
@@ -2125,8 +2335,11 @@ function openModal(item, triggerEl) {
     });
   });
 
-  document.getElementById('modal-link').href =
-    `https://www.google.com/search?q=${encodeURIComponent(item.title + ' allociné')}`;
+  const infoEl = document.getElementById('modal-link');
+  infoEl.href = item.tmdbId && item.tmdbType
+    ? `https://www.themoviedb.org/${item.tmdbType}/${item.tmdbId}`
+    : `https://www.google.com/search?q=${encodeURIComponent(item.title + ' site:themoviedb.org')}`;
+
   const trailerEl = document.getElementById('modal-trailer');
   trailerEl.onclick = null;
   trailerEl.href = item.youtubeId
@@ -2140,14 +2353,7 @@ function openModal(item, triggerEl) {
   starsEl.style.display = isWatchlistItem ? 'none' : '';
   if (ratingLabel) ratingLabel.style.display = isWatchlistItem ? 'none' : '';
 
-  const emojiRow = document.getElementById('modal-emoji-row');
-  const emojiBtn = document.getElementById('modal-emoji-btn');
   const isOwn    = currentUser && currentViewUid === currentUser.uid;
-  if (emojiRow) emojiRow.style.display = (!isWatchlistItem && isOwn) ? '' : 'none';
-  if (emojiBtn) {
-    emojiBtn.onclick = () => openEmojiPicker(item.title);
-  }
-  updateModalEmojiDisplay(item.title);
 
   const noteBtn      = document.getElementById('modal-note-btn');
   const noteExisting = document.getElementById('modal-note-existing');
@@ -2277,17 +2483,20 @@ posterZoomImg.addEventListener('dragstart', e => e.preventDefault());
 
 async function addToMyWatchlist(item, btn) {
   if (!currentUser) return;
-  const snap = await db.ref(`users/${currentUser.uid}/watchlist`).once('value');
-  const existing = Object.values(snap.val() || {});
-  if (existing.find(i => i.title === item.title)) {
+  const key  = catalogKey(item.title);
+  const snap = await db.ref(`users/${currentUser.uid}/watchlist/${key}`).once('value');
+  if (snap.exists()) {
     btn.textContent = 'Déjà dans ta Watchlist';
     btn.classList.add('copied');
     return;
   }
-  const copy = { ...item };
-  delete copy.stars;
-  existing.push(copy);
-  await db.ref(`users/${currentUser.uid}/watchlist`).set(existing);
+  const personal = extractPersonalFields(item);
+  personal.addedAt = personal.addedAt || new Date().toISOString();
+  delete personal.stars;
+  await Promise.all([
+    db.ref(`users/${currentUser.uid}/watchlist/${key}`).set(personal),
+    db.ref(`catalog/films/${key}`).update(extractSharedFields(item)),
+  ]);
   btn.textContent = '✓ Ajouté !';
   btn.classList.add('copied');
   btn.onclick = null;
@@ -2296,20 +2505,22 @@ async function addToMyWatchlist(item, btn) {
 async function copyItemToMyList(item, btn) {
   if (!currentUser) return;
   let arrName = 'films';
-  if (series.find(i => i.title === item.title)) arrName = 'series';
-  else if (anime.find(i => i.title === item.title)) arrName = 'anime';
+  if ([...series, ...anime].find(i => i.title === item.title)) arrName = 'series';
 
-  const snap = await db.ref(`users/${currentUser.uid}/${arrName}`).once('value');
-  const existing = Object.values(snap.val() || {});
-  if (existing.find(i => i.title === item.title)) {
+  const key  = catalogKey(item.title);
+  const snap = await db.ref(`users/${currentUser.uid}/${arrName}/${key}`).once('value');
+  if (snap.exists()) {
     btn.textContent = 'Déjà dans ta liste';
     btn.classList.add('copied');
     return;
   }
-  const copy = { ...item };
-  delete copy.stars;
-  existing.push(copy);
-  await db.ref(`users/${currentUser.uid}/${arrName}`).set(existing);
+  const personal = extractPersonalFields(item);
+  personal.addedAt = personal.addedAt || new Date().toISOString();
+  delete personal.stars;
+  await Promise.all([
+    db.ref(`users/${currentUser.uid}/${arrName}/${key}`).set(personal),
+    db.ref(`catalog/${arrName}/${key}`).update(extractSharedFields(item)),
+  ]);
   btn.textContent = '✓ Copié !';
   btn.classList.add('copied');
   btn.onclick = null;
@@ -2322,20 +2533,18 @@ async function transferFromWatchlist(item, targetList) {
   filmsBtn.disabled = true;
   seriesBtn.disabled = true;
 
-  const targetSnap = await db.ref(`users/${currentUser.uid}/${targetList}`).once('value');
-  const targetItems = Object.values(targetSnap.val() || {});
-  if (!targetItems.find(i => i.title === item.title)) {
-    const copy = { ...item };
-    delete copy.stars;
-    copy.addedAt = new Date().toISOString();
-    targetItems.push(copy);
-    await db.ref(`users/${currentUser.uid}/${targetList}`).set(targetItems);
-  }
+  const key = catalogKey(item.title);
+  const personal = extractPersonalFields(item);
+  delete personal.stars;
+  personal.addedAt = new Date().toISOString();
+
+  await Promise.all([
+    db.ref(`users/${currentUser.uid}/${targetList}/${key}`).set(personal),
+    db.ref(`users/${currentUser.uid}/watchlist/${key}`).remove(),
+    db.ref(`catalog/${targetList}/${key}`).update(extractSharedFields(item)),
+  ]);
 
   watchlist = watchlist.filter(i => i.title !== item.title);
-  const newWatchlist = watchlist;
-  await db.ref(`users/${currentUser.uid}/watchlist`).set(newWatchlist.length ? newWatchlist : null);
-
   if (targetList === 'films') films = [...films, { ...item }];
   else series = [...series, { ...item }];
 
@@ -2352,7 +2561,6 @@ modalBackdrop.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
 });
-window.addEventListener('scroll', closeModal, { passive: true });
 
 // ── Top Réal. / Top Cast. ────────────────────────────────────
 const topPopup      = document.getElementById('top-popup');
@@ -2388,18 +2596,24 @@ function showTopPopup(type) {
   }
   const top = computeTop(type === 'real' ? 'director' : 'cast', 50);
   topPopupTitle.textContent = type === 'real' ? 'Top Réalisateurs' : 'Top Acteurs';
-  topPopupList.innerHTML = top.map(([name, count], i) =>
-    `<li class="top-popup-item">
+  topPopupList.innerHTML = top.map(([name, count], i) => {
+    const person = catalogCache.people[catalogKey(name)];
+    const imgHtml = person?.profileImage
+      ? `<img class="top-popup-avatar" src="${person.profileImage}" alt="${name}" onerror="this.style.display='none'" />`
+      : '';
+    return `<li class="top-popup-item">
       <span class="top-popup-rank">${i + 1}.</span>
+      ${imgHtml}
       <span class="top-popup-name top-popup-name--link" data-search="${name.replace(/"/g, '&quot;')}">${name}</span>
       <span class="top-popup-count">${count} film${count > 1 ? 's' : ''}</span>
-    </li>`
-  ).join('');
+    </li>`;
+  }).join('');
 
   topPopupList.querySelectorAll('.top-popup-name--link').forEach(el => {
     el.addEventListener('click', () => {
       searchInput.value = el.dataset.search;
       updateSearchClear();
+      updatePersonBadge(el.dataset.search);
       closeTopPopup();
       render();
     });
@@ -2430,6 +2644,7 @@ function renderSidebarList(elId, items) {
     el.addEventListener('click', () => {
       searchInput.value = el.dataset.search;
       updateSearchClear();
+      updatePersonBadge(el.dataset.search);
       closeSideMenu();
       render();
     });
@@ -2728,27 +2943,32 @@ async function adminLoadData(uid) {
 }
 
 async function adminSaveData() {
-  const btn   = document.getElementById('admin-save-btn');
-  const label = document.getElementById('admin-save-label');
-  label.textContent = 'Sauvegarde…';
-  btn.disabled = true;
   try {
-    await db.ref(`users/${currentUser.uid}`).update({
-      films:     adminData.films,
-      series:    adminData.series,
-      anime:     adminData.anime,
-      watchlist: adminData.watchlist,
-    });
-    label.textContent = '✓ Sauvegardé';
-    setTimeout(() => { label.textContent = 'Sauvegarder'; btn.disabled = false; }, 2500);
+    const userUpdate    = {};
+    const catalogUpdate = {};
+
+    for (const listName of ['films', 'series', 'anime', 'watchlist']) {
+      const slimObj = {};
+      for (const item of adminData[listName]) {
+        const key    = catalogKey(item.title);
+        slimObj[key] = extractPersonalFields(item);
+        const shared = extractSharedFields(item);
+        if (shared.poster || shared.backdrop) {
+          const catType = listName === 'watchlist' ? 'films' : listName;
+          catalogUpdate[`catalog/${catType}/${key}`] = shared;
+        }
+      }
+      userUpdate[listName] = slimObj;
+    }
+
+    await Promise.all([
+      db.ref(`users/${currentUser.uid}`).update(userUpdate),
+      db.ref().update(catalogUpdate),
+    ]);
   } catch(e) {
     alert('Erreur sauvegarde : ' + e.message);
-    label.textContent = 'Sauvegarder';
-    btn.disabled = false;
   }
 }
-
-document.getElementById('admin-save-btn').addEventListener('click', adminSaveData);
 
 // ── Tabs ──────────────────────────────────────────────────────
 
@@ -2804,9 +3024,15 @@ function adminRenderList(visibleCount = ADMIN_PAGE_SIZE) {
       item.episodes ? item.episodes + ' ép.' : null,
     ].filter(Boolean).join(' · ');
 
+    const key = catalogKey(item.title);
+    const poster = item.poster
+      || catalogCache.films[key]?.poster
+      || catalogCache.series[key]?.poster
+      || catalogCache.anime[key]?.poster;
+
     el.innerHTML = `
-      ${item.poster
-        ? `<img class="entry-poster" src="${item.poster}" alt="" onerror="this.outerHTML='<div class=\\'entry-poster-placeholder\\'></div>'" />`
+      ${poster
+        ? `<img class="entry-poster" src="${poster}" alt="" onerror="this.outerHTML='<div class=\\'entry-poster-placeholder\\'></div>'" />`
         : `<div class="entry-poster-placeholder"></div>`}
       <div class="entry-info">
         <span class="entry-title">${item.title}</span>
@@ -2879,6 +3105,8 @@ function openAdminModal(idx = null) {
     document.getElementById('f-genre').value    = (item.genre   || []).join(', ');
     document.getElementById('f-poster').value   = item.poster   || '';
     document.getElementById('f-backdrop').value = item.backdrop || '';
+    document.getElementById('f-tmdb-id').value   = item.tmdbId   || '';
+    document.getElementById('f-tmdb-type').value = item.tmdbType || '';
     adminUpdatePosterPreview(item.poster);
     if (isFilm) {
       document.getElementById('f-director').value = item.director || '';
@@ -2907,7 +3135,6 @@ function closeAdminModal() {
 
 document.getElementById('admin-add-btn').addEventListener('click',        () => openAdminModal(null));
 document.getElementById('admin-modal-close-btn').addEventListener('click', closeAdminModal);
-document.getElementById('form-cancel').addEventListener('click',           closeAdminModal);
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
@@ -2929,14 +3156,18 @@ document.getElementById('entry-form').addEventListener('submit', e => {
 
   const backdropVal  = document.getElementById('f-backdrop').value.trim();
   const youtubeIdVal = document.getElementById('f-youtube-id').value.trim();
+  const tmdbIdVal    = document.getElementById('f-tmdb-id').value.trim();
+  const tmdbTypeVal  = document.getElementById('f-tmdb-type').value.trim();
   const entry = {
     title:    document.getElementById('f-title').value.trim(),
     genre:    document.getElementById('f-genre').value.split(',').map(g => g.trim()).filter(Boolean),
     poster:   document.getElementById('f-poster').value.trim(),
     url:      '#',
     year:     parseInt(document.getElementById('f-year').value) || null,
-    ...(backdropVal  ? { backdrop:   backdropVal  } : {}),
-    ...(youtubeIdVal ? { youtubeId: youtubeIdVal } : {}),
+    ...(backdropVal  ? { backdrop:   backdropVal          } : {}),
+    ...(youtubeIdVal ? { youtubeId:  youtubeIdVal         } : {}),
+    ...(tmdbIdVal    ? { tmdbId:     parseInt(tmdbIdVal)  } : {}),
+    ...(tmdbTypeVal  ? { tmdbType:   tmdbTypeVal          } : {}),
   };
 
   if (isFilm) {
@@ -2968,6 +3199,8 @@ document.getElementById('entry-form').addEventListener('submit', e => {
     _quickAddMode = false;
     document.getElementById('admin-panel').classList.add('hidden');
     adminSaveData().then(() => loadUserData(currentUser.uid));
+  } else {
+    adminSaveData();
   }
 });
 
@@ -2982,9 +3215,10 @@ function adminUpdatePosterPreview(url) {
 }
 
 // ── TMDB ──────────────────────────────────────────────────────
-async function adminTmdbFetch(endpoint) {
-  const sep = endpoint.includes('?') ? '&' : '?';
-  const res = await fetch(`https://api.themoviedb.org/3${endpoint}${sep}api_key=${TMDB_KEY}&language=fr-FR`);
+async function adminTmdbFetch(endpoint, lang = true) {
+  const sep      = endpoint.includes('?') ? '&' : '?';
+  const langPart = lang ? '&language=fr-FR' : '';
+  const res = await fetch(`https://api.themoviedb.org/3${endpoint}${sep}api_key=${TMDB_KEY}${langPart}&include_image_language=fr,en,null`);
   if (!res.ok) throw new Error(`TMDB ${res.status}`);
   return res.json();
 }
@@ -3001,25 +3235,47 @@ document.getElementById('tmdb-search-btn').addEventListener('click', adminTmdbSe
 document.getElementById('tmdb-query').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); adminTmdbSearch(); }
 });
+document.getElementById('tmdb-year').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); adminTmdbSearch(); }
+});
+
+function relevanceScore(title, q) {
+  const t = title.toLowerCase();
+  if (t === q) return 0;
+  if (t.startsWith(q)) return 1;
+  return 2;
+}
 
 async function adminTmdbSearch() {
   const query     = document.getElementById('tmdb-query').value.trim();
+  const yearVal   = document.getElementById('tmdb-year').value.trim();
   const resultsEl = document.getElementById('tmdb-results');
   if (!query) return;
 
   resultsEl.innerHTML = '<p class="tmdb-msg">Recherche…</p>';
+
+  const grid = document.createElement('div');
+  grid.className = 'tmdb-results-grid';
+
   try {
-    const isFilm   = adminTab === 'films';
-    const isWatch  = adminTab === 'watchlist';
-    const endpoint = isFilm
-      ? `/search/movie?query=${encodeURIComponent(query)}`
+    const isFilm    = adminTab === 'films';
+    const isWatch   = adminTab === 'watchlist';
+    const yearParam = yearVal ? `&${isFilm || isWatch ? 'primary_release_year' : 'first_air_date_year'}=${yearVal}` : '';
+    const base = isFilm
+      ? `/search/movie?query=${encodeURIComponent(query)}${yearParam}`
       : isWatch
-        ? `/search/multi?query=${encodeURIComponent(query)}`
-        : `/search/tv?query=${encodeURIComponent(query)}`;
-    const json     = await adminTmdbFetch(endpoint);
-    const results  = (json.results || [])
-      .filter(r => !isWatch || r.media_type === 'movie' || r.media_type === 'tv')
-      .slice(0, 8).map(r => {
+        ? `/search/multi?query=${encodeURIComponent(query)}${yearParam}`
+        : `/search/tv?query=${encodeURIComponent(query)}${yearParam}`;
+    const [page1, page2] = await Promise.all([
+      adminTmdbFetch(base),
+      adminTmdbFetch(`${base}&page=2`),
+    ]);
+    const tmdbResults = [
+      ...(page1.results || []),
+      ...(page2.results || []),
+    ]
+      .filter(r => (!isWatch || r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path)
+      .map(r => {
         const isMov = isFilm || (isWatch && r.media_type === 'movie');
         return {
           id:     r.id,
@@ -3030,35 +3286,58 @@ async function adminTmdbSearch() {
         };
       });
 
-    if (!results.length) { resultsEl.innerHTML = '<p class="tmdb-msg">Aucun résultat.</p>'; return; }
-
-    resultsEl.innerHTML = '';
-    const grid = document.createElement('div');
-    grid.className = 'tmdb-results-grid';
-    results.forEach(r => {
+    tmdbResults.forEach(r => {
+      const alreadyIn = adminData[adminTab]?.some(i => i.title === r.title);
       const card = document.createElement('div');
-      card.className = 'tmdb-card';
+      card.className = 'tmdb-card' + (alreadyIn ? ' tmdb-card-disabled' : '');
       card.innerHTML = `
         <img src="${r.poster || ''}" alt="" onerror="this.style.background='#222';this.src=''" />
         <div class="tmdb-card-info">
           <p class="tmdb-card-title">${r.title}</p>
-          <p class="tmdb-card-year">${r.year || ''}</p>
+          <p class="tmdb-card-year">${r.year || ''}${alreadyIn ? ' · <em>déjà dans la liste</em>' : ''}</p>
         </div>
       `;
-      card.addEventListener('click', () => adminTmdbAutoFill(r.id, r.type));
+      if (!alreadyIn) card.addEventListener('click', () => adminTmdbAutoFill(r.id, r.type));
       grid.appendChild(card);
     });
-    resultsEl.appendChild(grid);
+
+    resultsEl.innerHTML = '';
+    if (grid.children.length) resultsEl.appendChild(grid);
+    else resultsEl.innerHTML = '<p class="tmdb-msg">Aucun résultat.</p>';
   } catch(e) {
     resultsEl.innerHTML = '<p class="tmdb-msg">Erreur de recherche.</p>';
   }
 }
 
+async function adminAddFromCatalog(entry) {
+  const resultsEl = document.getElementById('tmdb-results');
+  const titleLow  = entry.title.toLowerCase();
+  const isDup     = adminData[adminTab]?.some(i => i.title.toLowerCase() === titleLow);
+  if (isDup) { document.getElementById('entry-dup-error').classList.remove('hidden'); return; }
+
+  const item = { ...entry, addedAt: new Date().toISOString() };
+  adminData[adminTab].push(item);
+  closeAdminModal();
+  adminRenderList();
+
+  if (_quickAddMode) {
+    _quickAddMode = false;
+    document.getElementById('admin-panel').classList.add('hidden');
+    adminSaveData().then(() => loadUserData(currentUser.uid));
+  } else {
+    adminSaveData();
+  }
+
+  resultsEl.innerHTML = `<p class="tmdb-msg tmdb-success">✓ "${entry.title}" ajouté depuis le catalogue.</p>`;
+}
+
 async function adminTmdbAutoFill(id, type) {
   const resultsEl = document.getElementById('tmdb-results');
-  resultsEl.innerHTML = '<p class="tmdb-msg">Chargement…</p>';
+  resultsEl.innerHTML = '<p class="tmdb-msg">Chargement du film…</p>';
   try {
     const details = await adminTmdbFetch(`/${type}/${id}?append_to_response=credits`);
+
+    const castRaw = (details.credits?.cast || []).slice(0, 8);
 
     if (type === 'movie') {
       document.getElementById('f-title').value  = details.title || '';
@@ -3071,8 +3350,7 @@ async function adminTmdbAutoFill(id, type) {
       }
       const director = details.credits?.crew?.find(c => c.job === 'Director');
       document.getElementById('f-director').value = director?.name || '';
-      const cast = (details.credits?.cast || []).slice(0, 8).map(c => c.name);
-      document.getElementById('f-cast').value = cast.join(', ');
+      document.getElementById('f-cast').value = castRaw.map(c => c.name).join(', ');
     } else {
       document.getElementById('f-title').value    = details.name || '';
       document.getElementById('f-year').value     = details.first_air_date?.slice(0, 4) || '';
@@ -3085,7 +3363,32 @@ async function adminTmdbAutoFill(id, type) {
     const videosData = await adminTmdbFetchVideos(type, id);
     const trailer = (videosData.results || []).find(v => v.type === 'Trailer' && v.site === 'YouTube') || (videosData.results || []).find(v => v.site === 'YouTube');
     document.getElementById('f-youtube-id').value = trailer?.key || '';
+    document.getElementById('f-tmdb-id').value    = id;
+    document.getElementById('f-tmdb-type').value  = type;
     adminUpdatePosterPreview(document.getElementById('f-poster').value);
+
+    // ── Import acteurs dans catalog/people ──
+    if (castRaw.length) {
+      resultsEl.innerHTML = `<p class="tmdb-msg">Import des acteurs (0 / ${castRaw.length})…</p>`;
+      let done = 0;
+      for (const person of castRaw) {
+        if (!person.name) continue;
+        const key = catalogKey(person.name);
+        const existing = (await db.ref(`catalog/people/${key}`).once('value')).val();
+        if (!existing?.profileImage) {
+          await db.ref(`catalog/people/${key}`).set({
+            name:         person.name,
+            tmdbId:       person.id,
+            profileImage: person.profile_path
+              ? `https://image.tmdb.org/t/p/w185${person.profile_path}`
+              : null,
+          });
+        }
+        done++;
+        resultsEl.innerHTML = `<p class="tmdb-msg">Import des acteurs (${done} / ${castRaw.length})…</p>`;
+      }
+    }
+
     const _poster = document.getElementById('f-poster').value;
     const _title  = document.getElementById('f-title').value;
     const _year   = document.getElementById('f-year').value;
@@ -3099,6 +3402,7 @@ async function adminTmdbAutoFill(id, type) {
         </div>
       </div>`;
     document.getElementById('form-submit').disabled = false;
+    document.getElementById('form-submit').click();
   } catch(e) {
     resultsEl.innerHTML = '<p class="tmdb-msg">Erreur lors du chargement.</p>';
   }
