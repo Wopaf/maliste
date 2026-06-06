@@ -1140,6 +1140,20 @@ header {
 }
 
 /* ── Stats Sidebar ── */
+@keyframes sidebarFadeIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.stats-sidebar.sidebar-fade-in {
+  animation: sidebarFadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+@keyframes contentFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.app-main-col.content-fade-in {
+  animation: contentFadeIn 0.45s ease both;
+}
 .stats-sidebar {
   width: 200px;
   flex-shrink: 0;
@@ -2910,6 +2924,13 @@ header {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+@keyframes homeLaunchIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.home-launch-in {
+  animation: homeLaunchIn 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
 @keyframes slideInApp {
   from { opacity: 0; transform: translateX(120px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -2926,9 +2947,11 @@ header {
 #main-app { min-height: 100vh; opacity: 1; }
 #main-app:not(.hidden):not(.sliding-out) { animation: slideInApp 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
 #main-app.sliding-out { animation: slideOutApp 0.3s cubic-bezier(0.55, 0, 0.75, 0.06) forwards; }
-.home-page { display: flex; flex-direction: column; min-height: 100vh; padding-bottom: 40px; opacity: 1; }
+.home-page { display: flex; flex-direction: column; min-height: 100vh; padding-bottom: 40px; opacity: 1; transition: opacity 0.25s ease; }
 .home-page.slide-in { animation: slideInAppLeft 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
 .home-page.hidden { display: none; }
+.home-page.fading { opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+.home-page.fading-in { opacity: 1; transition: opacity 0.35s ease; }
 
 /* ── Home header profil ── */
 .home-logo {
@@ -3010,12 +3033,19 @@ header {
   align-items: center;
   justify-content: center;
   position: relative;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
   overflow: hidden;
   flex-shrink: 0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.7);
 }
-.home-user-btn:hover { border-color: var(--accent); }
+.home-user-btn:hover {
+  border-color: transparent;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.08), rgba(255,255,255,0.08)),
+    linear-gradient(135deg, var(--grad-from, var(--accent)), var(--grad-to, var(--accent)));
+  background-origin: padding-box, border-box;
+  background-clip: padding-box, border-box;
+}
 
 .home-user-avatar {
   position: absolute;
@@ -3495,10 +3525,10 @@ header {
   width: 100%;
   overflow: hidden;
   border-radius: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.06);
+  border: none;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.06);
   margin: 0 auto;
-  opacity: 0.85;
-  transition: border-color 0.2s;
+  opacity: 0.90;
   transition: opacity 0.3s;
   position: relative;
 }
@@ -3506,13 +3536,34 @@ header {
   content: '';
   position: absolute;
   top: 0; right: 0; bottom: 0;
-  width: 70%;
-  background: linear-gradient(to right, transparent, rgba(13,13,13,0.3));
+  width: 20%;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.5));
   pointer-events: none;
   border-radius: 0 10px 10px 0;
   z-index: 100;
 }
-.home-carousel-row:hover { border-color: var(--accent); opacity: 1; }
+.home-carousel-row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(135deg, var(--grad-from, var(--accent)), var(--grad-to, var(--accent)));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: 200;
+}
+.home-carousel-row:hover {
+  opacity: 1;
+}
+.home-carousel-row:hover::before {
+  opacity: 1;
+}
 .home-carousel-row::-webkit-scrollbar { display: none; }
 
 .home-carousel-card {
@@ -3601,7 +3652,7 @@ header {
   width: 100px;
   transition: all 0.2s;
 }
-.home-community-card:hover { 
+.home-community-card:hover {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
@@ -4036,6 +4087,8 @@ header {
   cursor: pointer;
   transition: transform 0.15s, border-color 0.15s;
   outline: none;
+  background-origin: border-box;
+  background-size: 100% 100%;
 }
 .ep-color-swatch:hover { transform: scale(1.18); }
 .ep-color-swatch.selected { border-color: #fff; transform: scale(1.18); }
@@ -4060,7 +4113,7 @@ header {
 }
 .ep-cancel-btn:hover { background: rgba(255,255,255,0.05); color: #eee; }
 .ep-save-btn {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--grad-from, var(--accent)), var(--grad-to, var(--accent)));
   border: none;
   color: #fff;
   border-radius: 8px;
@@ -4119,7 +4172,8 @@ header {
 /* ── Admin buttons ── */
 .btn-primary {
   display: inline-flex; align-items: center; gap: 7px;
-  background: var(--accent); color: #fff; border: none; border-radius: 10px;
+  background: linear-gradient(135deg, var(--grad-from, var(--accent)), var(--grad-to, var(--accent)));
+  color: #fff; border: none; border-radius: 10px;
   padding: 9px 20px; font-size: 14px; font-weight: 600; cursor: pointer;
   transition: opacity 0.15s;
 }

@@ -11,6 +11,7 @@ const FIREBASE_CONFIG = {
     appId: "1:448540908211:web:894cb1e8c38d59c4a9eec6"
 };
 
+let _launchAnimPending = true;
 setTimeout(() => {
   const loader = document.getElementById('page-loader');
   loader.classList.add('fade-out');
@@ -404,7 +405,7 @@ const homeUserBtn  = document.getElementById('home-user-btn');
 const userMenu     = document.getElementById('user-menu');
 const backHomeBtn  = document.getElementById('back-home-btn');
 
-backHomeBtn.addEventListener('click', () => { if (searchInput.value) searchClear.click(); showHomePage(); });
+backHomeBtn.addEventListener('click', () => { if (searchInput.value) searchClear.click(); showHomePage(true); });
 
 function toggleUserMenu(anchor, e) {
   e.stopPropagation();
@@ -571,15 +572,29 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && profilesMo
 // ── Modal édition profil ──────────────────────────────────────
 const editProfileModal = document.getElementById('edit-profile-modal');
 const ACCENT_COLORS = [
-  '#097ee5', '#e05555', '#e07a35', '#c9b830',
-  '#4caf6a', '#7c5ce5', '#e0559a', '#17b8b0'
+  '#097ee5', '#e05555', '#e07a35',
+  '#27ae60', '#00b4d8', '#e91e8c', '#7c5ce5'
 ];
+const ACCENT_GRADIENTS = {
+  '#097ee5': ['#097ee5', '#0e9c98'],
+  '#e05555': ['#e05555', '#ff9a44'],
+  '#e07a35': ['#e07a35', '#f9ca24'],
+  '#27ae60': ['#27ae60', '#c8f542'],
+  '#00b4d8': ['#00b4d8', '#00f2c3'],
+  '#e91e8c': ['#e91e8c', '#ff6b35'],
+  '#7c5ce5': ['#4a00e0', '#a78bfa'],
+};
 let epSelectedColor  = null;
 let epSelectedAvatar = null;
 let epSelectedCover  = null;
 
 function applyAccentColor(color) {
   document.documentElement.style.setProperty('--accent', color);
+  const grad = ACCENT_GRADIENTS[color];
+  if (grad) {
+    document.documentElement.style.setProperty('--grad-from', grad[0]);
+    document.documentElement.style.setProperty('--grad-to',   grad[1]);
+  }
 }
 
 // ── Image picker modal ───────────────────────────────────────
@@ -711,7 +726,10 @@ function renderEpColorSwatches(selectedColor) {
   ACCENT_COLORS.forEach(color => {
     const btn = document.createElement('button');
     btn.className = 'ep-color-swatch' + (color === selectedColor ? ' selected' : '');
-    btn.style.background = color;
+    const grad = ACCENT_GRADIENTS[color];
+    btn.style.background = grad
+      ? `linear-gradient(135deg, ${grad[0]}, ${grad[1]})`
+      : color;
     btn.title = color;
     btn.addEventListener('click', () => {
       epSelectedColor = color;
@@ -810,17 +828,23 @@ function switchToUser(uid) {
 document.getElementById('back-my-list-btn').addEventListener('click', () => {
   if (!currentUser) return;
   if (searchInput.value) searchClear.click();
-  switchToUser(currentUser.uid);
-  restoreOwnHomeHeader();
-  showHomePage();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  homePageFadeTransition(() => {
+    switchToUser(currentUser.uid);
+    restoreOwnHomeHeader();
+    showHomePage('stagger');
+  });
 });
 
 document.getElementById('home-back-btn').addEventListener('click', () => {
-  if (currentUser) {
-    switchToUser(currentUser.uid);
-    restoreOwnHomeHeader();
-  }
-  showHomePage();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  homePageFadeTransition(() => {
+    if (currentUser) {
+      switchToUser(currentUser.uid);
+      restoreOwnHomeHeader();
+    }
+    showHomePage('stagger');
+  });
 });
 
 document.getElementById('edit-lists-link')?.addEventListener('click', e => {
@@ -921,18 +945,61 @@ function updateHomeViewingBanner() {
   banner.style.display = (currentUser && currentViewUid !== currentUser.uid) ? 'flex' : 'none';
 }
 
-function showHomePage() {
-  mainApp.classList.add('sliding-out');
+function homePageFadeTransition(callback) {
+  homePage.classList.remove('fading-in');
+  homePage.classList.add('fading');
+  setTimeout(() => {
+    callback();
+    setTimeout(() => {
+      homePage.classList.remove('fading');
+      void homePage.offsetWidth;
+      homePage.classList.add('fading-in');
+      homePage.addEventListener('transitionend', () => homePage.classList.remove('fading-in'), { once: true });
+    }, 80);
+  }, 200);
+}
+
+function triggerStaggerAnim(delay = 0) {
+  const sections = document.querySelectorAll('.home-content > *');
+  sections.forEach(el => {
+    el.classList.remove('home-launch-in');
+    el.style.opacity = '0';
+    void el.offsetWidth;
+  });
+  const run = () => {
+    sections.forEach((el, i) => {
+      el.style.opacity        = '';
+      el.style.animationDelay = `${i * 100}ms`;
+      el.classList.add('home-launch-in');
+    });
+  };
+  delay > 0 ? setTimeout(run, delay) : requestAnimationFrame(() => requestAnimationFrame(run));
+}
+
+function showHomePage(animate = false) {
+  if (animate === true) {
+    mainApp.classList.add('sliding-out');
+  }
   setTimeout(() => {
     mainApp.classList.remove('sliding-out');
     mainApp.classList.add('hidden');
     homePage.classList.remove('hidden');
-    homePage.classList.remove('slide-in');
-    void homePage.offsetWidth;
-    homePage.classList.add('slide-in');
+    if (animate === true) {
+      homePage.classList.remove('slide-in');
+      void homePage.offsetWidth;
+      homePage.classList.add('slide-in');
+    } else {
+      homePage.classList.remove('slide-in');
+    }
     updateHomeViewingBanner();
     populateHomePage();
-  }, 300);
+    if (_launchAnimPending) {
+      _launchAnimPending = false;
+      triggerStaggerAnim(900);
+    } else if (animate === 'stagger') {
+      triggerStaggerAnim(0);
+    }
+  }, animate === true ? 300 : 0);
 }
 
 function switchTab(tab) {
@@ -950,6 +1017,18 @@ function navigateToApp(tab) {
   homePage.classList.add('hidden');
   mainApp.classList.remove('hidden');
   window.scrollTo({ top: 0, behavior: 'instant' });
+  const sidebar = document.querySelector('.stats-sidebar');
+  if (sidebar) {
+    sidebar.classList.remove('sidebar-fade-in');
+    void sidebar.offsetWidth;
+    sidebar.classList.add('sidebar-fade-in');
+  }
+  const mainCol = document.querySelector('.app-main-col');
+  if (mainCol) {
+    mainCol.classList.remove('content-fade-in');
+    void mainCol.offsetWidth;
+    mainCol.classList.add('content-fade-in');
+  }
   if (tab) switchTab(tab);
   else render();
 }
@@ -1545,6 +1624,11 @@ function fillCommunityStrip() {
     entries.forEach(({ uid, name, avatar, accentColor, count }) => {
       const card = document.createElement('div');
       card.className = 'home-community-card';
+      const grad = accentColor && ACCENT_GRADIENTS[accentColor];
+      if (grad) {
+        card.style.setProperty('--grad-from', grad[0]);
+        card.style.setProperty('--grad-to',   grad[1]);
+      }
 
       const avatarDiv = document.createElement('div');
       avatarDiv.className = 'home-community-avatar';
@@ -1574,7 +1658,8 @@ function fillCommunityStrip() {
       card.appendChild(countEl);
 
       card.addEventListener('click', () => {
-        switchToUser(uid);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        homePageFadeTransition(() => switchToUser(uid));
       });
 
       strip.appendChild(card);
