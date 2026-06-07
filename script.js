@@ -12,10 +12,19 @@ const FIREBASE_CONFIG = {
 };
 
 let _launchAnimPending = true;
-setTimeout(() => {
+let _loaderMinDone  = false;
+let _authResolved   = false;
+
+function _fadeOutLoader() {
   const loader = document.getElementById('page-loader');
+  if (!loader) return;
   loader.classList.add('fade-out');
   loader.addEventListener('transitionend', () => loader.remove(), { once: true });
+}
+
+setTimeout(() => {
+  _loaderMinDone = true;
+  if (_authResolved) _fadeOutLoader();
 }, 800);
 
 firebase.initializeApp(FIREBASE_CONFIG);
@@ -858,7 +867,7 @@ document.getElementById('edit-lists-link')?.addEventListener('click', e => {
 });
 
 ['export-letterboxd-btn', 'sm-export-letterboxd-btn'].forEach(id => {
-  document.getElementById(id)?.addEventListener('click', () => { exportToLetterboxd(); closeSideMenu(); });
+  document.getElementById(id)?.addEventListener('click', () => { openImportExportModal(); closeSideMenu(); });
 });
 
 
@@ -901,6 +910,12 @@ async function updateHomeHeaderForUid(uid) {
   const descElGuest = document.getElementById('home-app-desc');
   if (descElGuest) descElGuest.textContent = p.description || '';
   applyAccentColor(p.accentColor || ACCENT_COLORS[0]);
+  const homeNav     = document.querySelector('.home-nav');
+  const homeLogo    = document.querySelector('.home-logo');
+  const homeMenuBtn = document.getElementById('home-menu-btn');
+  if (homeNav)     homeNav.style.display     = 'none';
+  if (homeLogo)    homeLogo.style.display    = 'none';
+  if (homeMenuBtn) homeMenuBtn.style.display = 'none';
   updateHomeViewingBanner();
   const filmsTitle    = document.getElementById('home-strip-films-title');
   const seriesTitle   = document.getElementById('home-strip-series-title');
@@ -936,6 +951,12 @@ function restoreOwnHomeHeader() {
     if (filmsTitle)  filmsTitle.textContent  = 'Films';
     if (seriesTitle) seriesTitle.textContent = 'Séries';
     if (watchTitle)  watchTitle.textContent  = 'Ma Watchlist';
+    const homeNav     = document.querySelector('.home-nav');
+    const homeLogo    = document.querySelector('.home-logo');
+    const homeMenuBtn = document.getElementById('home-menu-btn');
+    if (homeNav)     homeNav.style.display     = '';
+    if (homeLogo)    homeLogo.style.display    = '';
+    if (homeMenuBtn) homeMenuBtn.style.display = '';
   });
 }
 
@@ -1737,6 +1758,8 @@ function attachCarouselOverlap(row, extraOverlap = 2.5) {
 
 // ── État d'authentification ───────────────────────────────────
 auth.onAuthStateChanged(user => {
+  _authResolved = true;
+  if (_loaderMinDone) _fadeOutLoader();
   authSubmit.disabled = false;
   if (user) {
     currentUser    = user;
@@ -2930,6 +2953,231 @@ document.getElementById('home-strip-films')    .addEventListener('click', () => 
 document.getElementById('home-strip-series')   .addEventListener('click', () => navigateToApp('series'));
 document.getElementById('home-strip-watchlist').addEventListener('click', () => navigateToApp('watchlist'));
 
+// ── Nav home ──────────────────────────────────────────────────
+const _homeContent   = document.querySelector('.home-content');
+const _communityPage = document.getElementById('community-page');
+const _homeHeader    = document.querySelector('.home-header');
+
+function showHomeContent() {
+  _communityPage.classList.add('hidden');
+  _homeContent.style.display = '';
+  _homeHeader.classList.remove('community-mode');
+}
+function showCommunityPage() {
+  _homeContent.style.display = 'none';
+  _homeHeader.classList.add('community-mode');
+  _communityPage.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  loadCommunityPage();
+}
+
+(function() {
+  const navBtns     = document.querySelectorAll('.home-nav-btn');
+  const menuItems   = document.querySelectorAll('.home-menu-item');
+  const menuBtn      = document.getElementById('home-menu-btn');
+  const menuDropdown = document.getElementById('home-menu-dropdown');
+  const menuOverlay  = document.getElementById('home-menu-overlay');
+
+  function setActive(key) {
+    navBtns.forEach(b => b.classList.remove('active'));
+    menuItems.forEach(b => b.classList.remove('active'));
+    const navEl  = document.getElementById('home-nav-' + key);
+    const menuEl = document.getElementById('home-menu-' + key);
+    if (navEl)  navEl.classList.add('active');
+    if (menuEl) menuEl.classList.add('active');
+  }
+  setActive('profil');
+
+  function closeMenu() {
+    menuDropdown.classList.add('hidden');
+    menuBtn.classList.remove('open');
+    menuOverlay.classList.remove('visible');
+  }
+  menuBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = !menuDropdown.classList.contains('hidden');
+    if (isOpen) { closeMenu(); } else {
+      menuDropdown.classList.remove('hidden');
+      menuBtn.classList.add('open');
+      menuOverlay.classList.add('visible');
+    }
+  });
+  menuOverlay.addEventListener('click', () => closeMenu());
+
+  function scrollTo(id) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function handleProfil() {
+    setActive('profil');
+    showHomeContent();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    closeMenu();
+  }
+  function handleActivity() {
+    setActive('activity');
+    showHomeContent();
+    scrollTo('home-section-activity');
+    closeMenu();
+  }
+  function handleCommunity() {
+    setActive('community');
+    showCommunityPage();
+    closeMenu();
+  }
+
+  document.getElementById('home-nav-profil').addEventListener('click', handleProfil);
+  document.getElementById('home-nav-activity').addEventListener('click', handleActivity);
+  document.getElementById('home-nav-community').addEventListener('click', handleCommunity);
+  document.getElementById('home-menu-profil').addEventListener('click', handleProfil);
+  document.getElementById('home-menu-activity').addEventListener('click', handleActivity);
+  document.getElementById('home-menu-community').addEventListener('click', handleCommunity);
+})();
+
+let _communityLoaded = false;
+let _communityEntries = [];
+
+function loadCommunityPage() {
+  const grid = document.getElementById('community-grid');
+  if (!grid) return;
+  if (_communityLoaded) { renderCommunityGrid(_communityEntries); return; }
+  grid.innerHTML = '<p class="community-empty">Chargement…</p>';
+
+  db.ref('profiles').once('value').then(async profilesSnap => {
+    const profiles = profilesSnap.val() || {};
+    const uids = Object.keys(profiles);
+    const entries = await Promise.all(uids.map(async uid => {
+      const p    = profiles[uid];
+      const snap = await db.ref(`users/${uid}`).once('value');
+      const u    = snap.val() || {};
+      const filmsCount    = Object.values(u.films     || {}).length;
+      const seriesCount   = Object.values(u.series    || {}).length
+                          + Object.values(u.anime     || {}).length;
+      const watchlistCount = Object.values(u.watchlist || {}).length;
+      const recoRaw = u.recommendations;
+      const recos = Array.isArray(recoRaw)
+        ? recoRaw
+        : (recoRaw ? [...(recoRaw.films || []), ...(recoRaw.series || [])] : []);
+      return {
+        uid, name: p.name || '?', avatar: p.avatar || null,
+        coverImage: p.coverImage || null, accentColor: p.accentColor || null,
+        filmsCount, seriesCount, watchlistCount, recos,
+      };
+    }));
+    entries.sort((a, b) => (b.filmsCount + b.seriesCount) - (a.filmsCount + a.seriesCount));
+    _communityEntries = entries;
+    _communityLoaded  = true;
+    renderCommunityGrid(entries);
+  });
+}
+
+function renderCommunityGrid(entries) {
+  const grid   = document.getElementById('community-grid');
+  const search = document.getElementById('community-search').value.toLowerCase().trim();
+  const filtered = search ? entries.filter(e => e.name.toLowerCase().includes(search)) : entries;
+  grid.innerHTML = '';
+  if (!filtered.length) {
+    grid.innerHTML = '<p class="community-empty">Aucun utilisateur trouvé</p>';
+    return;
+  }
+  filtered.forEach(({ uid, name, avatar, coverImage, accentColor, filmsCount, seriesCount, watchlistCount, recos }, i) => {
+    const card = document.createElement('div');
+    card.className = 'community-full-card';
+    card.style.animationDelay = `${i * 60}ms`;
+
+    // Cover
+    const coverEl = document.createElement('div');
+    coverEl.className = 'community-full-cover';
+    if (coverImage) {
+      const img = document.createElement('img');
+      img.src = coverImage; img.alt = '';
+      coverEl.appendChild(img);
+    }
+    if (accentColor) {
+      const grad = ACCENT_GRADIENTS[accentColor];
+      coverEl.style.background = grad
+        ? `linear-gradient(135deg, ${grad[0]}55, ${grad[1]}55)`
+        : accentColor + '44';
+    }
+    card.appendChild(coverEl);
+
+    // Avatar (chevauche la cover)
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'community-full-avatar';
+    if (accentColor) avatarDiv.style.borderColor = accentColor;
+    if (avatar) {
+      const img = document.createElement('img');
+      img.src = avatar; img.alt = name;
+      avatarDiv.appendChild(img);
+    } else {
+      const span = document.createElement('span');
+      span.className = 'community-full-initials';
+      span.textContent = name[0].toUpperCase();
+      if (accentColor) avatarDiv.style.background = accentColor + '33';
+      avatarDiv.appendChild(span);
+    }
+
+    // Nom
+    const nameEl = document.createElement('span');
+    nameEl.className = 'community-full-name';
+    nameEl.textContent = name;
+
+    // Stats
+    const statsEl = document.createElement('div');
+    statsEl.className = 'community-full-stats';
+    statsEl.innerHTML = `
+      <span class="community-stat"><strong>${filmsCount}</strong> film${filmsCount !== 1 ? 's' : ''}</span>
+      <span class="community-stat-sep">·</span>
+      <span class="community-stat"><strong>${seriesCount}</strong> série${seriesCount !== 1 ? 's' : ''}</span>
+      <span class="community-stat-sep">·</span>
+      <span class="community-stat"><strong>${watchlistCount}</strong> watchlist</span>
+    `;
+
+    // Recommandations (6 posters)
+    const recoRow = document.createElement('div');
+    recoRow.className = 'community-full-recos';
+    for (let i = 0; i < 6; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'community-reco-slot';
+      const r = recos[i];
+      if (r?.poster) {
+        const img = document.createElement('img');
+        img.src = r.poster; img.alt = r.title || '';
+        img.title = r.title || '';
+        slot.appendChild(img);
+      }
+      recoRow.appendChild(slot);
+    }
+
+    card.append(avatarDiv, nameEl, statsEl, recoRow);
+    card.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      homePageFadeTransition(() => {
+        showHomeContent();
+        document.querySelectorAll('.home-nav-btn, .home-menu-item').forEach(b => b.classList.remove('active'));
+        const profilNav  = document.getElementById('home-nav-profil');
+        const profilMenu = document.getElementById('home-menu-profil');
+        if (profilNav)  profilNav.classList.add('active');
+        if (profilMenu) profilMenu.classList.add('active');
+        switchToUser(uid);
+      });
+    });
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('community-search').addEventListener('input', e => {
+  const clearBtn = document.getElementById('community-search-clear');
+  clearBtn.classList.toggle('hidden', !e.target.value);
+  renderCommunityGrid(_communityEntries);
+});
+document.getElementById('community-search-clear').addEventListener('click', () => {
+  document.getElementById('community-search').value = '';
+  document.getElementById('community-search-clear').classList.add('hidden');
+  renderCommunityGrid(_communityEntries);
+});
+
 function exportToLetterboxd() {
   if (!films.length) { alert('Aucun film à exporter.'); return; }
   const rows = [['Title', 'Year', 'Directors', 'Rating10']];
@@ -2951,9 +3199,62 @@ function exportToLetterboxd() {
   URL.revokeObjectURL(url);
 }
 
-document.getElementById('export-letterboxd-btn').addEventListener('click', () => {
+function openImportExportModal() {
+  const modal = document.getElementById('import-export-modal');
+  modal.classList.remove('hidden', 'closing');
+}
+function closeImportExportModal() {
+  const modal = document.getElementById('import-export-modal');
+  modal.classList.add('closing');
+  modal.addEventListener('animationend', () => {
+    modal.classList.add('hidden');
+    modal.classList.remove('closing');
+  }, { once: true });
+}
+
+document.getElementById('import-export-close').addEventListener('click', closeImportExportModal);
+document.getElementById('import-export-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeImportExportModal();
+});
+
+document.getElementById('ie-export-btn').addEventListener('click', () => {
   exportToLetterboxd();
-  closeSideMenu();
+  closeImportExportModal();
+});
+
+document.getElementById('ie-import-btn').addEventListener('click', () => {
+  document.getElementById('ie-csv-input').click();
+});
+
+document.getElementById('ie-csv-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file || !currentUser) return;
+  e.target.value = '';
+  closeImportExportModal();
+  let text = await file.text();
+
+  // Format liste Letterboxd : multi-sections séparées par ligne vide.
+  // On extrait la section qui contient les films (header "Position,Name,Year,…").
+  if (text.trimStart().startsWith('Letterboxd list export')) {
+    const sections = text.split(/\r?\n\s*\r?\n/);
+    const filmSection = sections.find(s => /^Position[,\t]/m.test(s));
+    if (!filmSection) return;
+    text = filmSection;
+  }
+
+  let rows = parseCsv(text);
+  if (!rows.length) return;
+
+  // Détection format Letterboxd (colonne "Name" au lieu de "Title")
+  if (rows[0]['Name'] !== undefined && rows[0]['Title'] === undefined) {
+    rows = rows.map(r => ({
+      Title:     r['Name']   || '',
+      Year:      r['Year']   || '',
+      Directors: '',
+      Rating10:  r['Rating'] ? String(Math.round(parseFloat(r['Rating']) * 2)) : '',
+    }));
+  }
+  await runCsvImport(rows);
 });
 
 document.getElementById('menu-btn').addEventListener('click', openSideMenu);
@@ -3521,7 +3822,7 @@ function parseCsv(text) {
     const row = {};
     header.forEach((h, i) => row[h] = cols[i] || '');
     return row;
-  }).filter(r => r.Title);
+  }).filter(r => r.Title || r.Name);
 }
 
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -3541,12 +3842,17 @@ document.getElementById('admin-csv-input').addEventListener('change', async e =>
 });
 
 async function runCsvImport(rows) {
-  const overlay    = document.getElementById('import-overlay');
-  const barEl      = document.getElementById('import-progress-bar');
-  const statusEl   = document.getElementById('import-status');
-  const currentEl  = document.getElementById('import-current');
-  const logEl      = document.getElementById('import-log');
-  const doneBtn    = document.getElementById('import-done-btn');
+  const overlay   = document.getElementById('import-overlay');
+  const barEl     = document.getElementById('import-progress-bar');
+  const statusEl  = document.getElementById('import-status');
+  const currentEl = document.getElementById('import-current');
+  const logEl     = document.getElementById('import-log');
+  const doneBtn   = document.getElementById('import-done-btn');
+  const abortBtn  = document.getElementById('import-abort-btn');
+
+  let aborted = false;
+  abortBtn.classList.remove('hidden');
+  abortBtn.onclick = () => { aborted = true; abortBtn.disabled = true; abortBtn.textContent = 'Interruption…'; };
 
   overlay.classList.remove('hidden');
   logEl.innerHTML = '';
@@ -3565,6 +3871,7 @@ async function runCsvImport(rows) {
   }
 
   for (let i = 0; i < total; i++) {
+    if (aborted) break;
     const row = rows[i];
     const title  = row['Title']     || '';
     const year   = row['Year']      || '';
@@ -3632,14 +3939,33 @@ async function runCsvImport(rows) {
   currentEl.textContent = '';
   try {
     if (!adminDataLoaded) await adminLoadData(currentUser.uid);
-    adminData.films = imported;
+    const existingTitles = new Set(adminData.films.map(f => f.title.toLowerCase()));
+    let added = 0, skipped = 0;
+    for (const entry of imported) {
+      if (existingTitles.has(entry.title.toLowerCase())) {
+        skipped++;
+      } else {
+        adminData.films.push(entry);
+        existingTitles.add(entry.title.toLowerCase());
+        added++;
+      }
+    }
     await adminSaveData();
     await loadUserData(currentUser.uid);
-    statusEl.textContent = `✓ Import terminé — ${imported.length} films importés, ${errors.length} erreurs.`;
+    const parts = [`${added} film${added !== 1 ? 's' : ''} ajouté${added !== 1 ? 's' : ''}`];
+    if (skipped)       parts.push(`${skipped} déjà présent${skipped !== 1 ? 's' : ''}`);
+    if (errors.length) parts.push(`${errors.length} erreur${errors.length !== 1 ? 's' : ''}`);
+    statusEl.textContent = aborted
+      ? `⏹ Import interrompu — ${parts.join(', ')}.`
+      : `✓ Import terminé — ${parts.join(', ')}.`;
   } catch(err) {
     statusEl.textContent = `Erreur de sauvegarde : ${err.message}`;
   }
 
+  abortBtn.classList.add('hidden');
+  abortBtn.disabled = false;
+  abortBtn.textContent = 'Interrompre';
+  currentEl.textContent = '';
   doneBtn.classList.remove('hidden');
 }
 

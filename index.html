@@ -19,8 +19,8 @@
 
   <!-- ── Écran de connexion ── -->
   <div id="auth-screen" class="auth-screen">
+    <img src="medias/logo1.png" class="auth-logo" alt="Logo" />
     <div class="auth-box">
-      <p class="auth-app-name">Mes Films & Séries</p>
       <p class="auth-mode-label" id="auth-mode-label">Connexion</p>
       <input type="email" id="auth-email" placeholder="Email" class="auth-input" autocomplete="email" />
       <input type="password" id="auth-password" placeholder="Mot de passe" class="auth-input" autocomplete="current-password" />
@@ -41,6 +41,20 @@
         <img class="home-header-bg" id="home-header-bg" src="" alt="" style="display:none" />
         <div class="home-cover-gradient"></div>
         <img class="home-logo" src="medias/logo1.png" alt="Logo" />
+        <nav class="home-nav">
+          <button class="home-nav-btn" id="home-nav-profil">Mon profil</button>
+          <button class="home-nav-btn" id="home-nav-activity">Activités</button>
+          <button class="home-nav-btn" id="home-nav-community">Communauté</button>
+        </nav>
+        <div class="home-menu-overlay" id="home-menu-overlay"></div>
+        <button class="home-menu-btn" id="home-menu-btn" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="home-menu-dropdown hidden" id="home-menu-dropdown">
+          <button class="home-menu-item" id="home-menu-profil">Mon profil</button>
+          <button class="home-menu-item" id="home-menu-activity">Activités</button>
+          <button class="home-menu-item" id="home-menu-community">Communauté</button>
+        </div>
       </div>
       <div class="home-profile-bar">
         <div class="home-profile-left">
@@ -100,13 +114,6 @@
         </div>
         <div id="home-activity-list"></div>
       </section>
-      <hr class="home-divider">
-      <section class="home-carousel" id="home-section-community">
-        <div class="home-carousel-hdr">
-          <h2 class="home-carousel-title">Communauté</h2>
-        </div>
-        <div class="home-strip home-strip-community" id="home-strip-community"></div>
-      </section>
       <section class="home-migrate-section hidden" id="home-migrate-section" style="display:none!important">
         <hr class="home-divider">
         <div class="home-migrate-box">
@@ -123,6 +130,25 @@
         </div>
       </section>
     </div>
+
+    <!-- ── Page Communauté ── -->
+    <div id="community-page" class="community-page hidden">
+      <div class="community-page-header">
+        <div class="search-bar community-search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="community-search" placeholder="Rechercher un utilisateur…" autocomplete="off" />
+          <button class="search-clear hidden" id="community-search-clear" aria-label="Effacer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div id="community-grid" class="community-grid"></div>
+    </div>
+
   </div>
 
   <!-- ── Application principale ── -->
@@ -216,7 +242,7 @@
         </button>
         <button class="sidebar-edit-btn" id="export-letterboxd-btn">
           <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
-          Exporter .csv
+          Import / Export
         </button>
       </div>
       <section class="sidebar-section sidebar-display-prefs">
@@ -378,7 +404,7 @@
           </button>
           <button class="sidebar-edit-btn" id="sm-export-letterboxd-btn">
             <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
-            Exporter .csv
+            Import / Export
           </button>
         </div>
         <section class="sidebar-section">
@@ -707,6 +733,63 @@
     </div>
   </div>
 
+  <!-- Modal Import / Export -->
+  <div class="admin-modal hidden" id="import-export-modal">
+    <div class="modal-box ie-modal-box">
+      <div class="modal-header">
+        <h2>Import / Export</h2>
+        <button class="modal-close-btn" id="import-export-close">✕</button>
+      </div>
+      <div class="ie-modal-body">
+
+        <div class="ie-section">
+          <div class="ie-section-head">
+            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
+            <h3>Importer une liste</h3>
+          </div>
+          <p class="ie-desc">Importez un fichier <strong>.csv</strong> pour ajouter des films à votre liste. Chaque film sera enrichi automatiquement via TMDB (affiche, réalisateur, durée, genres…).</p>
+          <p class="ie-steps-title">Depuis Letterboxd :</p>
+          <ol class="ie-steps">
+            <li>Connectez-vous sur <strong>letterboxd.com</strong></li>
+            <li>Allez dans <strong>Paramètres → Data → Export your data</strong></li>
+            <li>Cliquez sur <strong>Exporter vos données</strong> et téléchargez le ZIP</li>
+            <li>Extrayez le ZIP et importez le fichier .csv de votre choix</strong></li>
+          </ol>
+          <p class="ie-steps-title">Depuis cette app :</p>
+          <ol class="ie-steps">
+            <li>Importez directement un fichier exporté depuis cette app</li>
+          </ol>
+          <button class="btn-primary ie-action-btn" id="ie-import-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" height="15px" viewBox="0 -960 960 960" width="15px" fill="currentColor"><path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
+            Choisir un fichier .csv
+          </button>
+          <input type="file" id="ie-csv-input" accept=".csv" style="display:none" />
+        </div>
+
+        <div class="ie-divider"></div>
+
+        <div class="ie-section">
+          <div class="ie-section-head">
+            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
+            <h3>Exporter la liste</h3>
+          </div>
+          <p class="ie-desc">Exportez votre liste au format <strong>.csv</strong>, compatible avec Letterboxd pour y retrouver vos films et notes. Le fichier contient le titre, l'année, le réalisateur et la note.</p>
+          <p class="ie-steps-title">Importer sur Letterboxd :</p>
+          <ol class="ie-steps">
+            <li>Connectez-vous sur <strong>letterboxd.com</strong></li>
+            <li>Allez dans <strong>Paramètres → Data → Import your data</strong></li>
+            <li>Cliquez sur <strong>Importer des films</strong> et sélectionnez le fichier exporté</li>
+          </ol>
+          <button class="btn-ghost ie-action-btn" id="ie-export-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" height="15px" viewBox="0 -960 960 960" width="15px" fill="currentColor"><path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
+            Exporter en .csv
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Import CSV progress overlay -->
   <div class="import-overlay hidden" id="import-overlay">
     <div class="import-box">
@@ -717,7 +800,10 @@
       <p class="import-status" id="import-status">Initialisation…</p>
       <p class="import-current" id="import-current"></p>
       <div class="import-log" id="import-log"></div>
-      <button class="btn-ghost import-abort-btn hidden" id="import-done-btn">Fermer</button>
+      <div class="import-footer">
+        <button class="btn-danger import-abort-btn" id="import-abort-btn">Interrompre</button>
+        <button class="btn-ghost import-abort-btn hidden" id="import-done-btn">Fermer</button>
+      </div>
     </div>
   </div>
 
