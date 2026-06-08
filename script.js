@@ -804,16 +804,20 @@ async function saveEditProfile() {
     updates[`profiles/${currentUser.uid}/coverImage`] = epSelectedCover || null;
   }
 
-  await db.ref().update(updates);
-  saveBtn.disabled = false;
-
-  const coverImg = document.getElementById('home-header-bg');
-  if (coverImg && epSelectedCover) {
-    coverImg.src = epSelectedCover;
-    coverImg.style.display = 'block';
+  try {
+    await db.ref().update(updates);
+    const coverImg = document.getElementById('home-header-bg');
+    if (coverImg && epSelectedCover) {
+      coverImg.src = epSelectedCover;
+      coverImg.style.display = 'block';
+    }
+    closeEditProfileModal();
+  } catch (err) {
+    console.error('Erreur sauvegarde profil:', err);
+    alert('Erreur lors de la sauvegarde : ' + err.message);
+  } finally {
+    saveBtn.disabled = false;
   }
-
-  closeEditProfileModal();
 }
 
 function closeEditProfileModal() {
@@ -1217,8 +1221,26 @@ function openFollowListModal(mode) {
       const actionBtn = document.createElement('button');
       actionBtn.className = 'follow-list-action';
       actionBtn.textContent = mode === 'followers' ? 'Retirer' : 'Ne plus suivre';
+      let pendingConfirm = false;
 
       actionBtn.addEventListener('click', async () => {
+        if (!pendingConfirm) {
+          pendingConfirm = true;
+          actionBtn.textContent = 'Confirmer';
+          actionBtn.classList.add('follow-list-action-confirm');
+          // Annuler si on clique ailleurs
+          const cancel = () => {
+            if (!pendingConfirm) return;
+            pendingConfirm = false;
+            actionBtn.textContent = mode === 'followers' ? 'Retirer' : 'Ne plus suivre';
+            actionBtn.classList.remove('follow-list-action-confirm');
+            document.removeEventListener('click', onOutside);
+          };
+          const onOutside = e => { if (!actionBtn.contains(e.target)) cancel(); };
+          setTimeout(() => document.addEventListener('click', onOutside, { once: true }), 0);
+          return;
+        }
+        pendingConfirm = false;
         actionBtn.disabled = true;
         if (mode === 'followers') {
           // Retirer un abonné : supprimer des deux côtés
@@ -1254,11 +1276,18 @@ function openFollowListModal(mode) {
   });
 }
 
-document.getElementById('follow-list-modal-close').addEventListener('click', () => {
-  document.getElementById('follow-list-modal').classList.add('hidden');
-});
+function closeFollowListModal() {
+  const modal = document.getElementById('follow-list-modal');
+  modal.classList.add('closing');
+  modal.addEventListener('animationend', () => {
+    modal.classList.add('hidden');
+    modal.classList.remove('closing');
+  }, { once: true });
+}
+
+document.getElementById('follow-list-modal-close').addEventListener('click', closeFollowListModal);
 document.getElementById('follow-list-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+  if (e.target === e.currentTarget) closeFollowListModal();
 });
 
 function bindStatClicks() {
@@ -1359,7 +1388,7 @@ function navigateToApp(tab) {
 function populateHomePage() {
   fillStrip('home-strip-films',     [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)), films.length, false, 6);
   fillStrip('home-strip-series',    [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length, false, 6);
-  fillStrip('home-strip-watchlist', [...watchlist], watchlist.length, true, 8, 2);
+  fillStrip('home-strip-watchlist', [...watchlist], watchlist.length, true, 10, 2);
   fillCommunityStrip();
   fillActivitySection();
   fillRecoSection();
@@ -1407,7 +1436,7 @@ function populateHomePage() {
 
 // ── Migration vers le catalogue partagé ──────────────────────
 const CATALOG_SHARED_FIELDS = [
-  'title','poster','backdrop','director','cast','url','youtubeId',
+  'title','poster','backdrop','director','directorId','cast','url','youtubeId',
   'episodes','seasons','duration','time','genre','year','type',
   'tmdbId','tmdbType'
 ];
@@ -1603,6 +1632,7 @@ async function restoreCatalogFromTmdb() {
       if (isMov) {
         const dir = details.credits?.crew?.find(c => c.job === 'Director');
         shared.director = dir?.name || '';
+        if (dir?.id) shared.directorId = dir.id;
         shared.cast     = (details.credits?.cast || []).slice(0, 8).map(c => c.name);
         if (details.runtime) {
           const h = Math.floor(details.runtime / 60);
@@ -1692,6 +1722,47 @@ async function importPeopleFromTmdb() {
 }
 
 document.getElementById('home-import-people-btn').addEventListener('click', importPeopleFromTmdb);
+
+async function importDirectorIdsFromTmdb() {
+  const btn    = document.getElementById('home-import-director-ids-btn');
+  const status = document.getElementById('home-migrate-status');
+  btn.disabled = true;
+  status.classList.remove('hidden');
+  status.textContent = 'Chargement du catalogue…';
+
+  const filmsSnap = await db.ref('catalog/films').once('value');
+  const filmsObj  = filmsSnap.val() || {};
+
+  const toProcess = Object.entries(filmsObj).filter(([, item]) =>
+    item.tmdbId && item.tmdbType === 'movie' && !item.directorId
+  );
+
+  const total = toProcess.length;
+  let done = 0, failed = 0;
+  status.textContent = `0 / ${total} films à traiter…`;
+
+  for (const [key, item] of toProcess) {
+    try {
+      const details = await adminTmdbFetch(`/movie/${item.tmdbId}?append_to_response=credits`);
+      const dir = details.credits?.crew?.find(c => c.job === 'Director');
+      if (dir?.id) {
+        await db.ref(`catalog/films/${key}`).update({ directorId: dir.id });
+        done++;
+      } else {
+        failed++;
+      }
+    } catch (e) {
+      failed++;
+    }
+    status.textContent = `${done + failed} / ${total} — ${done} mis à jour, ${failed} échecs…`;
+    await new Promise(r => setTimeout(r, 260));
+  }
+
+  status.textContent = `✓ Terminé — ${done} réalisateurs importés, ${failed} non trouvés.`;
+  btn.disabled = false;
+}
+
+document.getElementById('home-import-director-ids-btn').addEventListener('click', importDirectorIdsFromTmdb);
 
 function showMigrateSection() {
   const section = document.getElementById('home-migrate-section');
@@ -2655,6 +2726,8 @@ const modalClose    = document.getElementById('modal-close');
 function openModal(item, triggerEl) {
   document.getElementById('modal-title').textContent = item.title;
   document.getElementById('modal-year').textContent = item.year ?? '';
+  const durEl = document.getElementById('modal-duration');
+  if (durEl) durEl.innerHTML = item.time ? `Durée : <span>${item.time}</span>` : '';
 
   const RATING_LABELS = ['Pas de note','Catastrophique','Vraiment Mauvais','Bof','Oubliable','Moyen','Bon film','Mérite d\'être vu','Excellent','Chef-d\'œuvre','Immense Chef-d\'œuvre'];
   const starsEl      = document.getElementById('modal-stars');
@@ -2707,9 +2780,15 @@ function openModal(item, triggerEl) {
     dirEl.style.display = '';
     castEl.style.display = '';
     seriesInfoEl.style.display = 'none';
-    dirEl.innerHTML = item.director
-      ? `Réalisateur: ${personLink(item.director)}`
-      : '';
+    if (item.director) {
+      const dirName = personLink(item.director);
+      const dirLink = item.directorId
+        ? `<a class="modal-director-tmdb" href="https://www.themoviedb.org/person/${item.directorId}" target="_blank" rel="noopener noreferrer">${dirName}</a>`
+        : dirName;
+      dirEl.innerHTML = `Réalisateur: ${dirLink}`;
+    } else {
+      dirEl.innerHTML = '';
+    }
     if (item.cast && item.cast.length) {
       castEl.innerHTML = '';
       const wrap = document.createElement('div');
@@ -3429,7 +3508,6 @@ function renderCommunityGrid(entries) {
     // Avatar (chevauche la cover)
     const avatarDiv = document.createElement('div');
     avatarDiv.className = 'community-full-avatar';
-    if (accentColor) avatarDiv.style.borderColor = accentColor;
     if (avatar) {
       const img = document.createElement('img');
       img.src = avatar; img.alt = name;
@@ -3458,22 +3536,6 @@ function renderCommunityGrid(entries) {
       <span class="community-stat"><strong>${titlesCount}</strong> titre${titlesCount !== 1 ? 's' : ''}</span>
     `;
 
-    // Recommandations (6 posters)
-    const recoRow = document.createElement('div');
-    recoRow.className = 'community-full-recos';
-    for (let i = 0; i < 6; i++) {
-      const slot = document.createElement('div');
-      slot.className = 'community-reco-slot';
-      const r = recos[i];
-      if (r?.poster) {
-        const img = document.createElement('img');
-        img.src = r.poster; img.alt = r.title || '';
-        img.title = r.title || '';
-        slot.appendChild(img);
-      }
-      recoRow.appendChild(slot);
-    }
-
     // Follow button — between name and stats
     const followBtnCard = document.createElement('button');
     followBtnCard.className = 'community-follow-btn';
@@ -3488,7 +3550,7 @@ function renderCommunityGrid(entries) {
       followBtnCard.style.display = 'none';
     }
 
-    card.append(avatarDiv, nameEl, followBtnCard, statsEl, recoRow);
+    card.append(avatarDiv, nameEl, statsEl, followBtnCard);
     card.addEventListener('click', () => {
       window.scrollTo({ top: 0, behavior: 'instant' });
       homePageFadeTransition(() => {
@@ -4478,6 +4540,19 @@ function renderPublicationsFeed(snap) {
     else el.style.animation = 'none';
 
     const av = makePubAvEl(post.author, post.avatar, post.accentColor);
+    if (post.uid && currentUser && post.uid !== currentUser.uid) {
+      av.style.cursor = 'pointer';
+      av.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        homePageFadeTransition(() => {
+          showHomeContent();
+          document.querySelectorAll('.home-nav-btn, .home-menu-item').forEach(b => b.classList.remove('active'));
+          document.getElementById('home-nav-profil')?.classList.add('active');
+          document.getElementById('home-menu-profil')?.classList.add('active');
+          switchToUser(post.uid);
+        });
+      });
+    }
 
     const body = document.createElement('div');
     body.className = 'pub-post-body';
@@ -4490,7 +4565,10 @@ function renderPublicationsFeed(snap) {
     const dateEl = document.createElement('span');
     dateEl.className = 'pub-post-date';
     dateEl.textContent = relativeTime(post.createdAt);
-    hdr.append(nameEl, dateEl);
+    const hdrRight = document.createElement('div');
+    hdrRight.className = 'pub-post-hdr-right';
+    hdrRight.appendChild(dateEl);
+    hdr.append(nameEl, hdrRight);
 
     const content = document.createElement('p');
     content.className = 'pub-post-content';
@@ -4498,7 +4576,23 @@ function renderPublicationsFeed(snap) {
 
     // Films attachés
     let filmsEl = null;
-    if (post.films && post.films.length > 0) {
+    let singleFilmEl = null;
+    if (post.films && post.films.length === 1) {
+      // Un seul film : poster à gauche du contenu
+      const f = post.films[0];
+      singleFilmEl = document.createElement('div');
+      singleFilmEl.className = 'pub-post-film-single';
+      singleFilmEl.style.cursor = 'pointer';
+      const img = document.createElement('img');
+      img.src = f.poster; img.alt = f.title || ''; img.title = f.title || '';
+      singleFilmEl.appendChild(img);
+      singleFilmEl.addEventListener('click', () => {
+        const found = [...(films || []), ...(series || []), ...(anime || [])]
+          .find(i => i.title === f.title);
+        openModal(found || { title: f.title, poster: f.poster, year: f.year }, singleFilmEl);
+      });
+    } else if (post.films && post.films.length > 1) {
+      // Plusieurs films : strip horizontale (comportement actuel)
       filmsEl = document.createElement('div');
       filmsEl.className = 'pub-post-films';
       post.films.forEach(f => {
@@ -4508,10 +4602,7 @@ function renderPublicationsFeed(snap) {
         const img = document.createElement('img');
         img.src = f.poster; img.alt = f.title || '';
         img.title = f.title || '';
-        const title = document.createElement('div');
-        title.className = 'pub-post-film-title';
-        title.textContent = f.title || '';
-        wrap.append(img, title);
+        wrap.appendChild(img);
         wrap.addEventListener('click', () => {
           const found = [...(films || []), ...(series || []), ...(anime || [])]
             .find(i => i.title === f.title);
@@ -4594,11 +4685,20 @@ function renderPublicationsFeed(snap) {
       });
 
       optWrap.appendChild(optBtn);
-      hdr.appendChild(optWrap);
+      hdrRight.appendChild(optWrap);
     }
 
-    if (filmsEl) body.append(hdr, content, filmsEl, actions);
-    else         body.append(hdr, content, actions);
+    if (singleFilmEl) {
+      // Poster gauche + contenu droit
+      const contentWrap = document.createElement('div');
+      contentWrap.className = 'pub-post-content-row';
+      contentWrap.append(singleFilmEl, content);
+      body.append(hdr, contentWrap, actions);
+    } else if (filmsEl) {
+      body.append(hdr, content, filmsEl, actions);
+    } else {
+      body.append(hdr, content, actions);
+    }
     el.append(av, body);
     feed.appendChild(el);
   });
