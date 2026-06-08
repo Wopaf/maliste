@@ -37,6 +37,8 @@ let currentViewName = '';
 
 let films     = [];
 let series    = [];
+let _followersCount = 0;
+let _followingCount = 0;
 let anime     = [];
 let watchlist = [];
 let recommendations = [null, null, null, null, null, null];
@@ -205,6 +207,9 @@ async function loadUserData(uid) {
 
   const merge = (userItems, catType) =>
     userItems.map(u => ({ ...(catalogCache[catType][catalogKey(u.title)] || {}), ...u }));
+
+  _followersCount = Object.keys(d.followers || {}).length;
+  _followingCount = Object.keys(d.following || {}).length;
 
   const userFilms     = Object.values(d.films     || {});
   const userSeries    = Object.values(d.series    || {});
@@ -445,8 +450,20 @@ userMenu.addEventListener('click', e => e.stopPropagation());
 // ── Avatar ───────────────────────────────────────────────────
 function setHomeHeaderBg(url) {
   const bg = document.getElementById('home-header-bg');
-  if (url) { bg.src = url; bg.style.display = 'block'; }
-  else bg.style.display = 'none';
+  if (url) {
+    bg.style.transition = 'none';
+    bg.style.opacity = '0';
+    bg.src = url;
+    bg.style.display = 'block';
+    requestAnimationFrame(() => {
+      bg.style.transition = 'opacity 0.7s ease';
+      bg.style.opacity = '1';
+    });
+  } else {
+    bg.style.display = 'none';
+    bg.style.opacity = '';
+    bg.style.transition = '';
+  }
 }
 
 function setAvatarDisplay(url) {
@@ -917,6 +934,21 @@ async function updateHomeHeaderForUid(uid) {
   if (homeLogo)    homeLogo.style.display    = 'none';
   if (homeMenuBtn) homeMenuBtn.style.display = 'none';
   updateHomeViewingBanner();
+
+  // Follow button in viewing banner (banner btn, kept for back-button row)
+  const bannerFollowBtn = document.getElementById('home-follow-btn');
+  if (bannerFollowBtn) bannerFollowBtn.classList.add('hidden');
+
+  // Follow button above home-app-title
+  const headerFollowBtn = document.getElementById('home-header-follow-btn');
+  if (headerFollowBtn && currentUser) {
+    headerFollowBtn.classList.remove('hidden');
+    updateFollowBtn(headerFollowBtn, uid);
+    const freshBtn = headerFollowBtn.cloneNode(true);
+    headerFollowBtn.parentNode.replaceChild(freshBtn, headerFollowBtn);
+    updateFollowBtn(freshBtn, uid);
+    freshBtn.addEventListener('click', () => handleFollowClick(freshBtn, uid));
+  }
   const filmsTitle    = document.getElementById('home-strip-films-title');
   const seriesTitle   = document.getElementById('home-strip-series-title');
   const watchTitle    = document.getElementById('home-strip-watchlist-title');
@@ -957,6 +989,8 @@ function restoreOwnHomeHeader() {
     if (homeNav)     homeNav.style.display     = '';
     if (homeLogo)    homeLogo.style.display    = '';
     if (homeMenuBtn) homeMenuBtn.style.display = '';
+    const hfb = document.getElementById('home-header-follow-btn');
+    if (hfb) hfb.classList.add('hidden');
   });
 }
 
@@ -964,6 +998,274 @@ function updateHomeViewingBanner() {
   const banner = document.getElementById('home-viewing-banner');
   if (!banner) return;
   banner.style.display = (currentUser && currentViewUid !== currentUser.uid) ? 'flex' : 'none';
+}
+
+// ── Follow system (request-based) ────────────────────────────
+async function getFollowState(targetUid) {
+  if (!currentUser || targetUid === currentUser.uid) return null;
+  const followingSnap = await db.ref(`users/${currentUser.uid}/following/${targetUid}`).once('value');
+  if (followingSnap.exists()) return 'following';
+  try {
+    const requestSnap = await db.ref(`followRequests/${targetUid}/${currentUser.uid}`).once('value');
+    if (requestSnap.exists()) return 'pending';
+  } catch (_) { /* règles Firebase : le demandeur ne peut pas lire les requêtes de l'autre */ }
+  return 'none';
+}
+
+function applyFollowBtnState(btn, state) {
+  btn.classList.remove('following', 'pending');
+  if (state === 'following') {
+    btn.textContent = 'Suivi';
+    btn.classList.add('following');
+  } else if (state === 'pending') {
+    btn.textContent = 'Demande envoyée';
+    btn.classList.add('pending');
+  } else {
+    btn.textContent = 'Suivre';
+  }
+}
+
+async function updateFollowBtn(btn, targetUid) {
+  const state = await getFollowState(targetUid);
+  applyFollowBtnState(btn, state);
+}
+
+async function handleFollowClick(btn, targetUid) {
+  if (!currentUser || targetUid === currentUser.uid) return;
+  btn.disabled = true;
+  // Lit l'état depuis les classes CSS du bouton — pas de lecture Firebase supplémentaire
+  const isCurrent = s => btn.classList.contains(s);
+  try {
+    if (isCurrent('following')) {
+      await db.ref(`users/${currentUser.uid}/following/${targetUid}`).remove();
+      await db.ref(`users/${targetUid}/followers/${currentUser.uid}`).remove();
+      applyFollowBtnState(btn, 'none');
+    } else if (isCurrent('pending')) {
+      await db.ref(`followRequests/${targetUid}/${currentUser.uid}`).remove();
+      applyFollowBtnState(btn, 'none');
+    } else {
+      const profileSnap = await db.ref(`profiles/${currentUser.uid}`).once('value');
+      const p = profileSnap.val() || {};
+      await db.ref(`followRequests/${targetUid}/${currentUser.uid}`).set({
+        uid: currentUser.uid,
+        name: p.name || currentUser.displayName || '?',
+        avatar: p.avatar || null,
+        createdAt: Date.now()
+      });
+      applyFollowBtnState(btn, 'pending');
+    }
+  } catch (err) {
+    console.error('Follow error:', err);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Follow requests badge ─────────────────────────────────────
+let _followRequestsRef      = null;
+let _followRequestsListener = null;
+let _pendingRequests        = {};
+
+function startFollowRequestsListener() {
+  if (!currentUser || _followRequestsRef) return;
+  _followRequestsRef = db.ref(`followRequests/${currentUser.uid}`);
+  _followRequestsListener = _followRequestsRef.on('value', snap => {
+    _pendingRequests = snap.val() || {};
+    updateFollowRequestsBadge();
+  });
+}
+
+function stopFollowRequestsListener() {
+  if (_followRequestsRef && _followRequestsListener) {
+    _followRequestsRef.off('value', _followRequestsListener);
+  }
+  _followRequestsRef = null;
+  _followRequestsListener = null;
+  _pendingRequests = {};
+  updateFollowRequestsBadge();
+}
+
+function updateFollowRequestsBadge() {
+  const wrap     = document.getElementById('follow-requests-wrap');
+  const countEl  = document.getElementById('follow-requests-count');
+  if (!wrap) return;
+  const count = Object.keys(_pendingRequests).length;
+  if (count > 0) {
+    wrap.classList.remove('hidden');
+    countEl.textContent = count;
+  } else {
+    wrap.classList.add('hidden');
+    document.getElementById('follow-requests-panel')?.classList.add('hidden');
+  }
+}
+
+function renderFollowRequestsPanel() {
+  const list = document.getElementById('follow-requests-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const entries = Object.entries(_pendingRequests);
+  if (!entries.length) {
+    list.innerHTML = '<p class="follow-req-empty">Aucune demande en attente</p>';
+    return;
+  }
+  entries.forEach(([uid, data]) => {
+    const item = document.createElement('div');
+    item.className = 'follow-req-item';
+
+    const left = document.createElement('div');
+    left.className = 'follow-req-left';
+
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'follow-req-avatar';
+    if (data.avatar) {
+      const img = document.createElement('img');
+      img.src = data.avatar; img.alt = '';
+      avatarDiv.appendChild(img);
+    } else {
+      avatarDiv.textContent = (data.name || '?')[0].toUpperCase();
+    }
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'follow-req-name';
+    nameEl.textContent = data.name || 'Utilisateur';
+
+    left.append(avatarDiv, nameEl);
+
+    const actions = document.createElement('div');
+    actions.className = 'follow-req-actions';
+
+    const acceptBtn = document.createElement('button');
+    acceptBtn.className = 'follow-req-accept';
+    acceptBtn.textContent = 'Accepter';
+
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'follow-req-reject';
+    rejectBtn.textContent = 'Refuser';
+
+    acceptBtn.addEventListener('click', async () => {
+      acceptBtn.disabled = true; rejectBtn.disabled = true;
+      await db.ref(`users/${currentUser.uid}/followers/${uid}`).set(true);
+      await db.ref(`users/${uid}/following/${currentUser.uid}`).set(true);
+      await db.ref(`followRequests/${currentUser.uid}/${uid}`).remove();
+    });
+
+    rejectBtn.addEventListener('click', async () => {
+      acceptBtn.disabled = true; rejectBtn.disabled = true;
+      await db.ref(`followRequests/${currentUser.uid}/${uid}`).remove();
+    });
+
+    actions.append(acceptBtn, rejectBtn);
+    item.append(left, actions);
+    list.appendChild(item);
+  });
+}
+
+// Badge click handler (set up once)
+document.getElementById('follow-requests-badge').addEventListener('click', e => {
+  e.stopPropagation();
+  const panel = document.getElementById('follow-requests-panel');
+  const opening = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !opening);
+  if (opening) renderFollowRequestsPanel();
+});
+document.addEventListener('click', () => {
+  document.getElementById('follow-requests-panel')?.classList.add('hidden');
+});
+
+// ── Modal Abonnés / Abonnements ──────────────────────────────
+function openFollowListModal(mode) {
+  // mode: 'followers' | 'following'
+  if (!currentUser) return;
+  const modal    = document.getElementById('follow-list-modal');
+  const titleEl  = document.getElementById('follow-list-modal-title');
+  const bodyEl   = document.getElementById('follow-list-modal-body');
+  titleEl.textContent = mode === 'followers' ? 'Abonnés' : 'Abonnements';
+  bodyEl.innerHTML = '<p class="follow-list-empty">Chargement…</p>';
+  modal.classList.remove('hidden');
+
+  const ref = mode === 'followers'
+    ? db.ref(`users/${currentUser.uid}/followers`)
+    : db.ref(`users/${currentUser.uid}/following`);
+
+  ref.once('value').then(async snap => {
+    const uids = Object.keys(snap.val() || {});
+    if (!uids.length) {
+      bodyEl.innerHTML = `<p class="follow-list-empty">${mode === 'followers' ? 'Aucun abonné' : 'Aucun abonnement'}</p>`;
+      return;
+    }
+    const profiles = await Promise.all(
+      uids.map(uid => db.ref(`profiles/${uid}`).once('value').then(s => ({ uid, ...(s.val() || {}) })))
+    );
+    bodyEl.innerHTML = '';
+    profiles.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'follow-list-item';
+
+      const avatarDiv = document.createElement('div');
+      avatarDiv.className = 'follow-list-avatar';
+      if (p.avatar) {
+        const img = document.createElement('img'); img.src = p.avatar; img.alt = '';
+        avatarDiv.appendChild(img);
+      } else {
+        avatarDiv.textContent = (p.name || '?')[0].toUpperCase();
+      }
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'follow-list-name';
+      nameEl.textContent = p.name || 'Utilisateur';
+
+      const actionBtn = document.createElement('button');
+      actionBtn.className = 'follow-list-action';
+      actionBtn.textContent = mode === 'followers' ? 'Retirer' : 'Ne plus suivre';
+
+      actionBtn.addEventListener('click', async () => {
+        actionBtn.disabled = true;
+        if (mode === 'followers') {
+          // Retirer un abonné : supprimer des deux côtés
+          await db.ref(`users/${currentUser.uid}/followers/${p.uid}`).remove();
+          await db.ref(`users/${p.uid}/following/${currentUser.uid}`).remove();
+        } else {
+          // Ne plus suivre : supprimer des deux côtés
+          await db.ref(`users/${currentUser.uid}/following/${p.uid}`).remove();
+          await db.ref(`users/${p.uid}/followers/${currentUser.uid}`).remove();
+        }
+        item.remove();
+        // Mettre à jour le compteur global et les stats
+        if (mode === 'followers') _followersCount = Math.max(0, _followersCount - 1);
+        else _followingCount = Math.max(0, _followingCount - 1);
+        const statsEl = document.getElementById('home-profile-stats');
+        if (statsEl) {
+          const titlesCount = films.length + series.length + anime.length;
+          statsEl.innerHTML = `
+            <div class="home-stat clickable" id="stat-followers"><strong>${_followersCount}</strong><span>Abonnés</span></div>
+            <div class="home-stat clickable" id="stat-following"><strong>${_followingCount}</strong><span>Abonnements</span></div>
+            <div class="home-stat"><strong>${titlesCount}</strong><span>Titres</span></div>
+          `;
+          bindStatClicks();
+        }
+        if (!bodyEl.querySelector('.follow-list-item')) {
+          bodyEl.innerHTML = `<p class="follow-list-empty">${mode === 'followers' ? 'Aucun abonné' : 'Aucun abonnement'}</p>`;
+        }
+      });
+
+      item.append(avatarDiv, nameEl, actionBtn);
+      bodyEl.appendChild(item);
+    });
+  });
+}
+
+document.getElementById('follow-list-modal-close').addEventListener('click', () => {
+  document.getElementById('follow-list-modal').classList.add('hidden');
+});
+document.getElementById('follow-list-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+});
+
+function bindStatClicks() {
+  const followersEl = document.getElementById('stat-followers');
+  const followingEl = document.getElementById('stat-following');
+  if (followersEl) followersEl.addEventListener('click', () => openFollowListModal('followers'));
+  if (followingEl) followingEl.addEventListener('click', () => openFollowListModal('following'));
 }
 
 function homePageFadeTransition(callback) {
@@ -1055,9 +1357,9 @@ function navigateToApp(tab) {
 }
 
 function populateHomePage() {
-  fillStrip('home-strip-films',     [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)), films.length);
-  fillStrip('home-strip-series',    [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length);
-  fillStrip('home-strip-watchlist', [...watchlist], watchlist.length, true, 10, 2);
+  fillStrip('home-strip-films',     [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)), films.length, false, 6);
+  fillStrip('home-strip-series',    [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length, false, 6);
+  fillStrip('home-strip-watchlist', [...watchlist], watchlist.length, true, 8, 2);
   fillCommunityStrip();
   fillActivitySection();
   fillRecoSection();
@@ -1073,24 +1375,33 @@ function populateHomePage() {
     db.ref(`profiles/${currentViewUid}/coverImage`).once('value').then(snap => {
       const saved = snap.val();
       if (saved) {
+        coverImg.style.transition = 'none';
+        coverImg.style.opacity = '0';
         coverImg.src = saved;
         coverImg.style.display = 'block';
+        requestAnimationFrame(() => {
+          coverImg.style.transition = 'opacity 0.7s ease';
+          coverImg.style.opacity = '1';
+        });
       } else {
         coverImg.style.display = 'none';
+        coverImg.style.opacity = '';
+        coverImg.style.transition = '';
       }
     });
   }
 
   const statsEl = document.getElementById('home-profile-stats');
   if (statsEl) {
-    const fc = films.length;
-    const sc = series.length + anime.length;
-    const wc = watchlist.length;
+    const titlesCount  = films.length + series.length + anime.length;
+    const isOwnProfile = currentUser && currentViewUid === currentUser.uid;
+    const fClass = isOwnProfile ? 'home-stat clickable' : 'home-stat';
     statsEl.innerHTML = `
-      <div class="home-stat"><strong>${fc}</strong><span>Films</span></div>
-      <div class="home-stat"><strong>${sc}</strong><span>Séries</span></div>
-      <div class="home-stat"><strong>${wc}</strong><span>Watchlist</span></div>
+      <div class="${fClass}" id="stat-followers"><strong>${_followersCount}</strong><span>Abonnés</span></div>
+      <div class="${fClass}" id="stat-following"><strong>${_followingCount}</strong><span>Abonnements</span></div>
+      <div class="home-stat"><strong>${titlesCount}</strong><span>Titres</span></div>
     `;
+    if (isOwnProfile) bindStatClicks();
   }
 }
 
@@ -1782,6 +2093,7 @@ auth.onAuthStateChanged(user => {
     loadUserData(user.uid);
     updateViewingBanner();
     showHomePage();
+    startFollowRequestsListener();
     if (window.location.hash === '#admin') {
       history.replaceState(null, '', window.location.pathname);
       setTimeout(() => openAdminPanel(), 0);
@@ -1791,6 +2103,7 @@ auth.onAuthStateChanged(user => {
     currentViewUid = null;
     films = []; series = []; anime = [];
     _dataReady = false;
+    stopFollowRequestsListener();
     authScreen.classList.remove('hidden');
     homePage.classList.add('hidden');
     mainApp.classList.add('hidden');
@@ -2960,10 +3273,21 @@ const _homeHeader    = document.querySelector('.home-header');
 
 function showHomeContent() {
   _communityPage.classList.add('hidden');
+  hidePublicationsPage();
   _homeContent.style.display = '';
   _homeHeader.classList.remove('community-mode');
+  const bg = document.getElementById('home-header-bg');
+  if (bg && bg.src && bg.style.display !== 'none') {
+    bg.style.transition = 'none';
+    bg.style.opacity = '0';
+    requestAnimationFrame(() => {
+      bg.style.transition = 'opacity 0.7s ease';
+      bg.style.opacity = '1';
+    });
+  }
 }
 function showCommunityPage() {
+  hidePublicationsPage();
   _homeContent.style.display = 'none';
   _homeHeader.classList.add('community-mode');
   _communityPage.classList.remove('hidden');
@@ -3017,8 +3341,7 @@ function showCommunityPage() {
   }
   function handleActivity() {
     setActive('activity');
-    showHomeContent();
-    scrollTo('home-section-activity');
+    showPublicationsPage();
     closeMenu();
   }
   function handleCommunity() {
@@ -3051,10 +3374,11 @@ function loadCommunityPage() {
       const p    = profiles[uid];
       const snap = await db.ref(`users/${uid}`).once('value');
       const u    = snap.val() || {};
-      const filmsCount    = Object.values(u.films     || {}).length;
-      const seriesCount   = Object.values(u.series    || {}).length
-                          + Object.values(u.anime     || {}).length;
-      const watchlistCount = Object.values(u.watchlist || {}).length;
+      const titlesCount    = Object.values(u.films  || {}).length
+                           + Object.values(u.series || {}).length
+                           + Object.values(u.anime  || {}).length;
+      const followersCount = Object.keys(u.followers || {}).length;
+      const followingCount = Object.keys(u.following || {}).length;
       const recoRaw = u.recommendations;
       const recos = Array.isArray(recoRaw)
         ? recoRaw
@@ -3062,10 +3386,10 @@ function loadCommunityPage() {
       return {
         uid, name: p.name || '?', avatar: p.avatar || null,
         coverImage: p.coverImage || null, accentColor: p.accentColor || null,
-        filmsCount, seriesCount, watchlistCount, recos,
+        titlesCount, followersCount, followingCount, recos,
       };
     }));
-    entries.sort((a, b) => (b.filmsCount + b.seriesCount) - (a.filmsCount + a.seriesCount));
+    entries.sort((a, b) => b.titlesCount - a.titlesCount);
     _communityEntries = entries;
     _communityLoaded  = true;
     renderCommunityGrid(entries);
@@ -3081,7 +3405,7 @@ function renderCommunityGrid(entries) {
     grid.innerHTML = '<p class="community-empty">Aucun utilisateur trouvé</p>';
     return;
   }
-  filtered.forEach(({ uid, name, avatar, coverImage, accentColor, filmsCount, seriesCount, watchlistCount, recos }, i) => {
+  filtered.forEach(({ uid, name, avatar, coverImage, accentColor, titlesCount, followersCount, followingCount, recos }, i) => {
     const card = document.createElement('div');
     card.className = 'community-full-card';
     card.style.animationDelay = `${i * 60}ms`;
@@ -3127,11 +3451,11 @@ function renderCommunityGrid(entries) {
     const statsEl = document.createElement('div');
     statsEl.className = 'community-full-stats';
     statsEl.innerHTML = `
-      <span class="community-stat"><strong>${filmsCount}</strong> film${filmsCount !== 1 ? 's' : ''}</span>
+      <span class="community-stat"><strong>${followersCount}</strong> abonné${followersCount !== 1 ? 's' : ''}</span>
       <span class="community-stat-sep">·</span>
-      <span class="community-stat"><strong>${seriesCount}</strong> série${seriesCount !== 1 ? 's' : ''}</span>
+      <span class="community-stat"><strong>${followingCount}</strong> abonnement${followingCount !== 1 ? 's' : ''}</span>
       <span class="community-stat-sep">·</span>
-      <span class="community-stat"><strong>${watchlistCount}</strong> watchlist</span>
+      <span class="community-stat"><strong>${titlesCount}</strong> titre${titlesCount !== 1 ? 's' : ''}</span>
     `;
 
     // Recommandations (6 posters)
@@ -3150,7 +3474,21 @@ function renderCommunityGrid(entries) {
       recoRow.appendChild(slot);
     }
 
-    card.append(avatarDiv, nameEl, statsEl, recoRow);
+    // Follow button — between name and stats
+    const followBtnCard = document.createElement('button');
+    followBtnCard.className = 'community-follow-btn';
+    followBtnCard.textContent = 'Suivre';
+    if (currentUser && uid !== currentUser.uid) {
+      updateFollowBtn(followBtnCard, uid);
+      followBtnCard.addEventListener('click', e => {
+        e.stopPropagation();
+        handleFollowClick(followBtnCard, uid);
+      });
+    } else {
+      followBtnCard.style.display = 'none';
+    }
+
+    card.append(avatarDiv, nameEl, followBtnCard, statsEl, recoRow);
     card.addEventListener('click', () => {
       window.scrollTo({ top: 0, behavior: 'instant' });
       homePageFadeTransition(() => {
@@ -3621,9 +3959,6 @@ document.getElementById('tmdb-search-btn').addEventListener('click', adminTmdbSe
 document.getElementById('tmdb-query').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); adminTmdbSearch(); }
 });
-document.getElementById('tmdb-year').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); adminTmdbSearch(); }
-});
 
 function relevanceScore(title, q) {
   const t = title.toLowerCase();
@@ -3634,7 +3969,6 @@ function relevanceScore(title, q) {
 
 async function adminTmdbSearch() {
   const query     = document.getElementById('tmdb-query').value.trim();
-  const yearVal   = document.getElementById('tmdb-year').value.trim();
   const resultsEl = document.getElementById('tmdb-results');
   if (!query) return;
 
@@ -3646,12 +3980,11 @@ async function adminTmdbSearch() {
   try {
     const isFilm    = adminTab === 'films';
     const isWatch   = adminTab === 'watchlist';
-    const yearParam = yearVal ? `&${isFilm || isWatch ? 'primary_release_year' : 'first_air_date_year'}=${yearVal}` : '';
     const base = isFilm
-      ? `/search/movie?query=${encodeURIComponent(query)}${yearParam}`
+      ? `/search/movie?query=${encodeURIComponent(query)}`
       : isWatch
-        ? `/search/multi?query=${encodeURIComponent(query)}${yearParam}`
-        : `/search/tv?query=${encodeURIComponent(query)}${yearParam}`;
+        ? `/search/multi?query=${encodeURIComponent(query)}`
+        : `/search/tv?query=${encodeURIComponent(query)}`;
     const [page1, page2] = await Promise.all([
       adminTmdbFetch(base),
       adminTmdbFetch(`${base}&page=2`),
@@ -4077,4 +4410,517 @@ async function runFetchTrailers() {
 document.getElementById('trailers-done-btn').addEventListener('click', () => {
   document.getElementById('trailers-overlay').classList.add('hidden');
 });
+
+// ── Publications ─────────────────────────────────────────────
+
+let _pubRef         = null;
+let _pubListener    = null;
+let _pubInitedComp  = false;
+let _pubFirstRender = true;
+let _pubFollowingUids = new Set();
+
+function relativeTime(ts) {
+  const diff = Date.now() - ts;
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return 'à l\'instant';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `il y a ${d} j`;
+  return new Date(ts).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function makePubAvEl(name, avatar, color) {
+  const el = document.createElement('div');
+  el.className = 'pub-post-av';
+  el.style.background = color || 'var(--accent)';
+  if (avatar) {
+    const img = document.createElement('img');
+    img.src = avatar; img.alt = '';
+    el.appendChild(img);
+  } else {
+    el.textContent = (name || '?')[0].toUpperCase();
+  }
+  return el;
+}
+
+function renderPublicationsFeed(snap) {
+  const feed = document.getElementById('pub-feed');
+  if (!feed) return;
+
+  const allPosts = [];
+  snap.forEach(child => { allPosts.push({ id: child.key, ...child.val() }); });
+
+  // Filtrer : seulement ses propres posts + ceux des comptes suivis
+  const myUid = currentUser?.uid;
+  const posts = allPosts.filter(p => p.uid === myUid || _pubFollowingUids.has(p.uid));
+
+  posts.sort((a, b) => b.createdAt - a.createdAt);
+  posts.splice(50);
+
+  if (!posts.length) {
+    feed.innerHTML = allPosts.length
+      ? '<p class="pub-empty">Suivez des utilisateurs pour voir leurs publications ici.</p>'
+      : '<p class="pub-empty">Aucune publication pour l\'instant. Soyez le premier !</p>';
+    return;
+  }
+
+  const animate = _pubFirstRender;
+  _pubFirstRender = false;
+
+  feed.innerHTML = '';
+  posts.forEach((post, i) => {
+    const el = document.createElement('div');
+    el.className = 'pub-post';
+    if (animate) el.style.animationDelay = `${i * 40}ms`;
+    else el.style.animation = 'none';
+
+    const av = makePubAvEl(post.author, post.avatar, post.accentColor);
+
+    const body = document.createElement('div');
+    body.className = 'pub-post-body';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'pub-post-hdr';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'pub-post-name';
+    nameEl.textContent = post.author || '?';
+    const dateEl = document.createElement('span');
+    dateEl.className = 'pub-post-date';
+    dateEl.textContent = relativeTime(post.createdAt);
+    hdr.append(nameEl, dateEl);
+
+    const content = document.createElement('p');
+    content.className = 'pub-post-content';
+    content.textContent = post.content;
+
+    // Films attachés
+    let filmsEl = null;
+    if (post.films && post.films.length > 0) {
+      filmsEl = document.createElement('div');
+      filmsEl.className = 'pub-post-films';
+      post.films.forEach(f => {
+        const wrap = document.createElement('div');
+        wrap.className = 'pub-post-film';
+        wrap.style.cursor = 'pointer';
+        const img = document.createElement('img');
+        img.src = f.poster; img.alt = f.title || '';
+        img.title = f.title || '';
+        const title = document.createElement('div');
+        title.className = 'pub-post-film-title';
+        title.textContent = f.title || '';
+        wrap.append(img, title);
+        wrap.addEventListener('click', () => {
+          const found = [...(films || []), ...(series || []), ...(anime || [])]
+            .find(i => i.title === f.title);
+          openModal(found || { title: f.title, poster: f.poster, year: f.year }, wrap);
+        });
+        filmsEl.appendChild(wrap);
+      });
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'pub-post-actions';
+
+    const votesObj = post.votes || {};
+    const upCount  = Object.values(votesObj).filter(v => v === 'up').length;
+    const dnCount  = Object.values(votesObj).filter(v => v === 'down').length;
+    const myVote   = currentUser ? (votesObj[currentUser.uid] || null) : null;
+
+    const SVG_UP   = `<svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M840-640q32 0 56 24t24 56v80q0 7-2 15t-4 15L794-168q-9 20-30 34t-44 14H280v-520l240-238q15-15 35.5-17.5T595-888q19 10 28 28t4 37l-45 183h258Zm-480 34v406h360l120-280v-80H480l54-220-174 174ZM160-120q-33 0-56.5-23.5T80-200v-360q0-33 23.5-56.5T160-640h120v80H160v360h120v80H160Zm200-80v-406 406Z"/></svg>`;
+    const SVG_DOWN = `<svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M120-320q-32 0-56-24t-24-56v-80q0-7 2-15t4-15l120-282q9-20 30-34t44-14h440v520L440-82q-15 15-35.5 17.5T365-72q-19-10-28-28t-4-37l45-183H120Zm480-34v-406H240L120-480v80h360l-54 220 174-174Zm200-486q33 0 56.5 23.5T880-760v360q0 33-23.5 56.5T800-320H680v-80h120v-360H680v-80h120Zm-200 80v406-406Z"/></svg>`;
+
+    function makeVoteBtn(type, svg, count, active) {
+      const btn = document.createElement('button');
+      btn.className = 'pub-vote-btn' + (active ? ' active-' + type : '');
+      btn.innerHTML = svg + (count > 0 ? `<span>${count}</span>` : '');
+      btn.addEventListener('click', () => {
+        if (!currentUser) return;
+        const ref = db.ref(`posts/${post.id}/votes/${currentUser.uid}`);
+        if (myVote === type) ref.remove(); else ref.set(type);
+      });
+      return btn;
+    }
+
+    actions.append(
+      makeVoteBtn('up',   SVG_UP,   upCount, myVote === 'up'),
+      makeVoteBtn('down', SVG_DOWN, dnCount, myVote === 'down'),
+    );
+
+    // ── Options (own posts only) ──
+    const isOwn = currentUser && post.uid === currentUser.uid;
+    if (isOwn) {
+      const optWrap = document.createElement('div');
+      optWrap.className = 'pub-post-options';
+
+      const optBtn = document.createElement('button');
+      optBtn.className = 'pub-options-btn';
+      optBtn.setAttribute('aria-label', 'Options');
+      optBtn.innerHTML = '···';
+
+      let menu = null;
+      function closeOptMenu() { if (menu) { menu.remove(); menu = null; } }
+
+      optBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (menu) { closeOptMenu(); return; }
+
+        menu = document.createElement('div');
+        menu.className = 'pub-options-menu';
+
+        const editItem = document.createElement('button');
+        editItem.className = 'pub-options-item';
+        editItem.textContent = 'Modifier ce post';
+        editItem.addEventListener('click', () => {
+          closeOptMenu();
+          startEditPost(post, content);
+        });
+
+        const delItem = document.createElement('button');
+        delItem.className = 'pub-options-item danger';
+        delItem.textContent = 'Supprimer ce post';
+        delItem.addEventListener('click', () => {
+          closeOptMenu();
+          db.ref(`posts/${post.id}`).remove();
+        });
+
+        menu.append(editItem, delItem);
+        optWrap.appendChild(menu);
+
+        const onOutside = () => { closeOptMenu(); document.removeEventListener('click', onOutside); };
+        setTimeout(() => document.addEventListener('click', onOutside), 0);
+      });
+
+      optWrap.appendChild(optBtn);
+      hdr.appendChild(optWrap);
+    }
+
+    if (filmsEl) body.append(hdr, content, filmsEl, actions);
+    else         body.append(hdr, content, actions);
+    el.append(av, body);
+    feed.appendChild(el);
+  });
+}
+
+function startEditPost(post, contentEl) {
+  const original = post.content;
+
+  const area = document.createElement('textarea');
+  area.className = 'pub-edit-area';
+  area.value = original;
+  area.rows = Math.max(3, original.split('\n').length);
+
+  const editActions = document.createElement('div');
+  editActions.className = 'pub-edit-actions';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'pub-edit-cancel';
+  cancelBtn.textContent = 'Annuler';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'pub-edit-save';
+  saveBtn.textContent = 'Enregistrer';
+
+  cancelBtn.addEventListener('click', () => {
+    area.replaceWith(contentEl);
+    editActions.remove();
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const newContent = area.value.trim();
+    if (!newContent || newContent === original) {
+      cancelBtn.click();
+      return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.textContent = '…';
+    try {
+      await db.ref(`posts/${post.id}/content`).set(newContent);
+      contentEl.textContent = newContent;
+      post.content = newContent;
+    } catch(err) {
+      console.error('Erreur modification :', err);
+    } finally {
+      area.replaceWith(contentEl);
+      editActions.remove();
+    }
+  });
+
+  editActions.append(cancelBtn, saveBtn);
+  contentEl.replaceWith(area);
+  area.after(editActions);
+  area.focus();
+  area.setSelectionRange(area.value.length, area.value.length);
+}
+
+let _selectedFilms = [];
+
+function initPublicationsComposer() {
+  if (_pubInitedComp) {
+    updatePubComposerAvatar();
+    return;
+  }
+  _pubInitedComp = true;
+
+  const input          = document.getElementById('pub-input');
+  const charEl         = document.getElementById('pub-char-count');
+  const submitBtn      = document.getElementById('pub-submit');
+  const addFilmBtn      = document.getElementById('pub-add-film-btn');
+  const selectedFilmsEl = document.getElementById('pub-selected-films');
+
+  updatePubComposerAvatar();
+
+  // ── Char counter ──
+  input.addEventListener('input', () => {
+    const rem = 280 - input.value.length;
+    charEl.textContent = rem;
+    charEl.className = 'pub-char-count' + (rem < 0 ? ' critical' : rem < 20 ? ' low' : '');
+    submitBtn.disabled = !input.value.trim() || input.value.length > 280;
+  });
+
+  // ── Film modal ──
+  addFilmBtn.addEventListener('click', () => openPubFilmModal());
+
+  function renderSelectedFilms() {
+    selectedFilmsEl.innerHTML = '';
+    selectedFilmsEl.classList.toggle('hidden', _selectedFilms.length === 0);
+    _selectedFilms.forEach((f, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'pub-selected-film';
+      const img = document.createElement('img');
+      img.src = f.poster; img.alt = f.title;
+      const rm = document.createElement('button');
+      rm.className = 'pub-selected-film-remove';
+      rm.innerHTML = '×';
+      rm.addEventListener('click', () => {
+        _selectedFilms.splice(i, 1);
+        renderSelectedFilms();
+      });
+      wrap.append(img, rm);
+      selectedFilmsEl.appendChild(wrap);
+    });
+  }
+
+  // ── Submit ──
+  submitBtn.addEventListener('click', async () => {
+    const content = input.value.trim();
+    if (!content || content.length > 280 || !currentUser) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '…';
+
+    try {
+      const snap = await db.ref(`profiles/${currentUser.uid}`).once('value');
+      const p = snap.val() || {};
+
+      const postData = {
+        uid:         currentUser.uid,
+        author:      p.name || currentUser.displayName || '?',
+        avatar:      p.avatar || null,
+        accentColor: p.accentColor || null,
+        content,
+        createdAt:   Date.now(),
+      };
+      if (_selectedFilms.length > 0) postData.films = _selectedFilms;
+
+      await db.ref('posts').push(postData);
+
+      input.value = '';
+      charEl.textContent = '280';
+      charEl.className = 'pub-char-count';
+      _selectedFilms = [];
+      renderSelectedFilms();
+    } catch (err) {
+      console.error('Erreur publication :', err);
+    } finally {
+      submitBtn.disabled = !input.value.trim();
+      submitBtn.textContent = 'Publier';
+    }
+  });
+}
+
+function updatePubComposerAvatar() {
+  if (!currentUser) return;
+  const compAv = document.getElementById('pub-composer-av');
+  if (!compAv) return;
+  db.ref(`profiles/${currentUser.uid}`).once('value').then(snap => {
+    const p = snap.val() || {};
+    compAv.style.background = p.accentColor || 'var(--accent)';
+    compAv.innerHTML = '';
+    if (p.avatar) {
+      const img = document.createElement('img');
+      img.src = p.avatar; img.alt = '';
+      compAv.appendChild(img);
+    } else {
+      compAv.textContent = (p.name || currentUser.displayName || '?')[0].toUpperCase();
+    }
+  });
+}
+
+async function loadPublicationsFeed() {
+  if (_pubRef) return;
+  document.getElementById('pub-feed').innerHTML = '<p class="pub-empty">Chargement…</p>';
+
+  // Charger la liste des comptes suivis avant d'activer le listener
+  if (currentUser) {
+    const followingSnap = await db.ref(`users/${currentUser.uid}/following`).once('value');
+    _pubFollowingUids = new Set(Object.keys(followingSnap.val() || {}));
+  } else {
+    _pubFollowingUids = new Set();
+  }
+
+  _pubRef = db.ref('posts');
+  _pubListener = _pubRef.on('value', snap => {
+    renderPublicationsFeed(snap);
+  }, err => {
+    console.error('Publications feed error:', err);
+  });
+}
+
+function showPublicationsPage() {
+  _homeContent.style.display = 'none';
+  _communityPage.classList.add('hidden');
+  _homeHeader.classList.add('community-mode');
+  const pubPage = document.getElementById('publications-page');
+  pubPage.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  _pubFirstRender = true;
+  initPublicationsComposer();
+  loadPublicationsFeed();
+}
+
+function hidePublicationsPage() {
+  const pubPage = document.getElementById('publications-page');
+  if (!pubPage || pubPage.classList.contains('hidden')) return;
+  pubPage.classList.add('hidden');
+  if (_pubRef && _pubListener) {
+    _pubRef.off('value', _pubListener);
+    _pubRef = null;
+    _pubListener = null;
+  }
+  _pubFollowingUids = new Set();
+}
+
+// ── Modal sélection films pour post ──────────────────────────
+
+function openPubFilmModal() {
+  const modal  = document.getElementById('pub-film-modal');
+  const grid   = document.getElementById('pub-film-modal-grid');
+  const search = document.getElementById('pub-film-modal-search');
+  const count  = document.getElementById('pub-film-modal-count');
+  if (!modal) return;
+
+  // Construire le pool depuis le catalogue
+  const pool = [];
+  const seen = new Set();
+  const addEntry = (obj) => {
+    Object.values(obj).forEach(f => {
+      if (!f.poster || !f.title) return;
+      const key = f.title.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      pool.push({ title: f.title, poster: f.poster, year: f.year || '' });
+    });
+  };
+  addEntry(catalogCache.films  || {});
+  addEntry(catalogCache.series || {});
+  addEntry(catalogCache.anime  || {});
+  pool.sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+
+  // État local de sélection dans la modal (copie de _selectedFilms)
+  let modalSelection = [..._selectedFilms];
+
+  function updateCount() {
+    const n = modalSelection.length;
+    count.textContent = n === 0 ? 'Aucun film sélectionné'
+      : n === 1 ? '1 film sélectionné'
+      : `${n} films sélectionnés (max 5)`;
+  }
+
+  function renderGrid(q) {
+    grid.innerHTML = '';
+    if (!q) {
+      grid.innerHTML = '<p class="pub-empty" style="grid-column:1/-1">Tapez le nom d\'un film pour rechercher…</p>';
+      return;
+    }
+    const filtered = pool.filter(f => f.title.toLowerCase().includes(q.toLowerCase()));
+    if (!filtered.length) {
+      grid.innerHTML = '<p class="pub-empty" style="grid-column:1/-1">Aucun résultat.</p>';
+      return;
+    }
+
+    filtered.slice(0, 10).forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'pub-film-modal-item';
+      const isSelected = modalSelection.some(s => s.title === f.title);
+      if (isSelected) item.classList.add('selected');
+
+      const img = document.createElement('img');
+      img.src = f.poster; img.alt = f.title;
+      img.loading = 'lazy';
+
+      const check = document.createElement('div');
+      check.className = 'pub-film-check';
+      check.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+      const title = document.createElement('div');
+      title.className = 'pub-film-modal-item-title';
+      title.textContent = f.title;
+
+      item.append(img, check, title);
+      item.addEventListener('click', () => {
+        const idx = modalSelection.findIndex(s => s.title === f.title);
+        if (idx >= 0) {
+          modalSelection.splice(idx, 1);
+          item.classList.remove('selected');
+        } else {
+          if (modalSelection.length >= 5) return;
+          modalSelection.push({ title: f.title, poster: f.poster, year: f.year });
+          item.classList.add('selected');
+        }
+        updateCount();
+      });
+      grid.appendChild(item);
+    });
+  }
+
+  search.value = '';
+  renderGrid('');
+  updateCount();
+  modal.classList.remove('hidden');
+  setTimeout(() => search.focus(), 80);
+
+  search.oninput = () => renderGrid(search.value.trim());
+
+  document.getElementById('pub-film-modal-confirm').onclick = () => {
+    _selectedFilms = modalSelection;
+    // Mettre à jour l'affichage des films sélectionnés dans le compositeur
+    const selEl = document.getElementById('pub-selected-films');
+    if (selEl) {
+      selEl.innerHTML = '';
+      selEl.classList.toggle('hidden', _selectedFilms.length === 0);
+      _selectedFilms.forEach((f, i) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'pub-selected-film';
+        const img = document.createElement('img');
+        img.src = f.poster; img.alt = f.title;
+        const rm = document.createElement('button');
+        rm.className = 'pub-selected-film-remove';
+        rm.innerHTML = '×';
+        rm.addEventListener('click', () => {
+          _selectedFilms.splice(i, 1);
+          selEl.children[i]?.remove();
+          selEl.classList.toggle('hidden', _selectedFilms.length === 0);
+        });
+        wrap.append(img, rm);
+        selEl.appendChild(wrap);
+      });
+    }
+    modal.classList.add('hidden');
+  };
+
+  document.getElementById('pub-film-modal-close').onclick = () => modal.classList.add('hidden');
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); }, { once: true });
+}
 

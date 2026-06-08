@@ -34,6 +34,7 @@
   <div id="home-page" class="home-page hidden">
     <div id="home-viewing-banner" class="viewing-banner" style="display:none">
       <span>Profil de <strong class="viewing-banner-name" id="home-viewing-name"></strong></span>
+      <button id="home-follow-btn" class="follow-btn hidden">Suivre</button>
       <button id="home-back-btn" class="viewing-banner-back">← Mon profil</button>
     </div>
     <header class="home-header">
@@ -43,7 +44,7 @@
         <img class="home-logo" src="medias/logo1.png" alt="Logo" />
         <nav class="home-nav">
           <button class="home-nav-btn" id="home-nav-profil">Mon profil</button>
-          <button class="home-nav-btn" id="home-nav-activity">Activités</button>
+          <button class="home-nav-btn" id="home-nav-activity">Publications</button>
           <button class="home-nav-btn" id="home-nav-community">Communauté</button>
         </nav>
         <div class="home-menu-overlay" id="home-menu-overlay"></div>
@@ -52,7 +53,7 @@
         </button>
         <div class="home-menu-dropdown hidden" id="home-menu-dropdown">
           <button class="home-menu-item" id="home-menu-profil">Mon profil</button>
-          <button class="home-menu-item" id="home-menu-activity">Activités</button>
+          <button class="home-menu-item" id="home-menu-activity">Publications</button>
           <button class="home-menu-item" id="home-menu-community">Communauté</button>
         </div>
       </div>
@@ -63,8 +64,18 @@
             <span class="home-user-initials" id="home-user-initials"></span>
           </button>
           <div class="home-app-title-wrap">
+            <button id="home-header-follow-btn" class="follow-btn hidden">Suivre</button>
             <p class="home-app-title" id="home-app-title"></p>
             <p class="home-app-desc" id="home-app-desc"></p>
+          </div>
+        </div>
+        <div class="follow-requests-wrap hidden" id="follow-requests-wrap">
+          <button class="follow-requests-badge" id="follow-requests-badge" title="Demandes de suivi">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+            <span id="follow-requests-count">0</span>
+          </button>
+          <div class="follow-requests-panel hidden" id="follow-requests-panel">
+            <div class="follow-requests-list" id="follow-requests-list"></div>
           </div>
         </div>
         <div class="home-profile-stats" id="home-profile-stats"></div>
@@ -129,6 +140,30 @@
           <p class="home-migrate-status hidden" id="home-migrate-status"></p>
         </div>
       </section>
+    </div>
+
+    <!-- ── Page Publications ── -->
+    <div id="publications-page" class="publications-page hidden">
+      <div class="pub-wrap">
+        <div class="pub-composer" id="pub-composer">
+          <div class="pub-composer-right">
+            <textarea class="pub-input" id="pub-input" placeholder="Quoi de neuf ?" maxlength="280"></textarea>
+            <div class="pub-selected-films hidden" id="pub-selected-films"></div>
+            <div class="pub-composer-bar">
+              <button class="pub-add-film-btn" id="pub-add-film-btn" title="Ajouter un lien">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="2" y1="17" x2="7" y2="17"/></svg>
+                Ajouter un lien
+              </button>
+              <span class="pub-char-count" id="pub-char-count">280</span>
+              <button class="pub-submit" id="pub-submit" disabled>Publier</button>
+            </div>
+          </div>
+        </div>
+        <div class="pub-divider"></div>
+        <div class="pub-feed" id="pub-feed">
+          <p class="pub-empty">Chargement…</p>
+        </div>
+      </div>
     </div>
 
     <!-- ── Page Communauté ── -->
@@ -605,7 +640,6 @@
         <div id="tmdb-section">
           <div class="tmdb-bar">
             <input type="text" id="tmdb-query" placeholder="Rechercher sur TMDB…" />
-            <input type="number" id="tmdb-year" placeholder="Année" min="1900" max="2099" style="width:90px;flex-shrink:0" />
             <button class="btn-ghost" id="tmdb-search-btn">Rechercher</button>
           </div>
           <div id="tmdb-results"></div>
@@ -733,6 +767,26 @@
     </div>
   </div>
 
+  <!-- Modal sélection de films pour post -->
+  <div class="admin-modal hidden" id="pub-film-modal">
+    <div class="modal-box pub-film-modal-box">
+      <div class="pub-film-modal-hdr">
+        <span class="pub-film-modal-title">Ajouter des films</span>
+        <button class="modal-close-btn" id="pub-film-modal-close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="pub-film-modal-search-wrap">
+        <input type="text" class="pub-film-modal-search" id="pub-film-modal-search" placeholder="Rechercher un film, une série…" autocomplete="off" />
+      </div>
+      <div class="pub-film-modal-grid" id="pub-film-modal-grid"></div>
+      <div class="pub-film-modal-footer">
+        <span class="pub-film-modal-count" id="pub-film-modal-count">Aucun film sélectionné</span>
+        <button class="pub-film-modal-confirm" id="pub-film-modal-confirm">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Import / Export -->
   <div class="admin-modal hidden" id="import-export-modal">
     <div class="modal-box ie-modal-box">
@@ -804,6 +858,19 @@
         <button class="btn-danger import-abort-btn" id="import-abort-btn">Interrompre</button>
         <button class="btn-ghost import-abort-btn hidden" id="import-done-btn">Fermer</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal Abonnés / Abonnements -->
+  <div class="admin-modal hidden" id="follow-list-modal">
+    <div class="modal-box follow-list-modal-box">
+      <div class="follow-list-modal-hdr">
+        <span class="follow-list-modal-title" id="follow-list-modal-title">Abonnés</span>
+        <button class="modal-close-btn" id="follow-list-modal-close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="follow-list-modal-body" id="follow-list-modal-body"></div>
     </div>
   </div>
 
