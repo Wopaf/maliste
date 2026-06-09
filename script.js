@@ -90,12 +90,19 @@ async function setNote(title, note) {
   if (!found) return;
   const { item, arrName } = found;
   const key = catalogKey(title);
-  if (note.trim()) {
-    item.note = note.trim();
-    await db.ref(`users/${currentUser.uid}/${arrName}/${key}/note`).set(note.trim());
-  } else {
-    delete item.note;
-    await db.ref(`users/${currentUser.uid}/${arrName}/${key}/note`).remove();
+  const fbKey = item._fbKey || key;
+  const path = `users/${currentUser.uid}/${arrName}/${fbKey}/note`;
+  try {
+    if (note.trim()) {
+      item.note = note.trim();
+      await db.ref(path).set(note.trim());
+    } else {
+      delete item.note;
+      await db.ref(path).remove();
+    }
+  } catch (err) {
+    console.error('setNote error — path:', path, err);
+    alert('Erreur sauvegarde note : ' + err.message);
   }
 }
 
@@ -169,13 +176,13 @@ function setRating(title, stars) {
   const found = findItemAndList(title);
   if (!found) return;
   const { item, arrName } = found;
-  const key = catalogKey(title);
+  const fbKey = item._fbKey || catalogKey(title);
   if (stars === 0) {
     delete item.stars;
-    db.ref(`users/${currentUser.uid}/${arrName}/${key}/stars`).remove();
+    db.ref(`users/${currentUser.uid}/${arrName}/${fbKey}/stars`).remove();
   } else {
     item.stars = stars;
-    db.ref(`users/${currentUser.uid}/${arrName}/${key}/stars`).set(stars);
+    db.ref(`users/${currentUser.uid}/${arrName}/${fbKey}/stars`).set(stars);
   }
   refreshViews();
 }
@@ -205,25 +212,24 @@ async function loadUserData(uid) {
     people: catPeopleSnap.val() || {},
   };
 
-  const merge = (userItems, catType) =>
-    userItems.map(u => ({ ...(catalogCache[catType][catalogKey(u.title)] || {}), ...u }));
+  const merge = (rawObj, catType) =>
+    Object.entries(rawObj || {})
+      .filter(([, u]) => u?.title)
+      .map(([fbKey, u]) => ({ ...(catalogCache[catType][catalogKey(u.title)] || {}), ...u, _fbKey: fbKey }));
 
   _followersCount = Object.keys(d.followers || {}).length;
   _followingCount = Object.keys(d.following || {}).length;
 
-  const userFilms     = Object.values(d.films     || {});
-  const userSeries    = Object.values(d.series    || {});
-  const userAnime     = Object.values(d.anime     || {});
-  const userWatchlist = Object.values(d.watchlist || {});
-
-  films     = merge(userFilms,     'films');
-  series    = merge(userSeries,    'series');
-  anime     = merge(userAnime,     'anime');
-  watchlist = userWatchlist.map(u => {
-    const key = catalogKey(u.title);
-    const cat = catalogCache.films[key] || catalogCache.series[key] || catalogCache.anime[key] || {};
-    return { ...cat, ...u };
-  });
+  films     = merge(d.films,     'films');
+  series    = merge(d.series,    'series');
+  anime     = merge(d.anime,     'anime');
+  watchlist = Object.entries(d.watchlist || {})
+    .filter(([, u]) => u?.title)
+    .map(([fbKey, u]) => {
+      const key = catalogKey(u.title);
+      const cat = catalogCache.films[key] || catalogCache.series[key] || catalogCache.anime[key] || {};
+      return { ...cat, ...u, _fbKey: fbKey };
+    });
 
   const rec = d.recommendations || {};
   if (Array.isArray(rec)) {
@@ -1019,13 +1025,15 @@ async function getFollowState(targetUid) {
 function applyFollowBtnState(btn, state) {
   btn.classList.remove('following', 'pending');
   if (state === 'following') {
-    btn.textContent = 'Suivi';
-    btn.classList.add('following');
-  } else if (state === 'pending') {
-    btn.textContent = 'Demande envoyée';
-    btn.classList.add('pending');
+    btn.style.display = 'none';
   } else {
-    btn.textContent = 'Suivre';
+    btn.style.display = '';
+    if (state === 'pending') {
+      btn.textContent = 'Demande envoyée';
+      btn.classList.add('pending');
+    } else {
+      btn.textContent = 'Suivre';
+    }
   }
 }
 
@@ -1207,16 +1215,26 @@ function openFollowListModal(mode) {
 
       const avatarDiv = document.createElement('div');
       avatarDiv.className = 'follow-list-avatar';
+      avatarDiv.style.cursor = 'pointer';
       if (p.avatar) {
         const img = document.createElement('img'); img.src = p.avatar; img.alt = '';
         avatarDiv.appendChild(img);
       } else {
         avatarDiv.textContent = (p.name || '?')[0].toUpperCase();
       }
+      avatarDiv.addEventListener('click', () => {
+        closeFollowListModal();
+        homePageFadeTransition(() => { showHomeContent(); switchToUser(p.uid); });
+      });
 
       const nameEl = document.createElement('span');
       nameEl.className = 'follow-list-name';
       nameEl.textContent = p.name || 'Utilisateur';
+      nameEl.style.cursor = 'pointer';
+      nameEl.addEventListener('click', () => {
+        closeFollowListModal();
+        homePageFadeTransition(() => { showHomeContent(); switchToUser(p.uid); });
+      });
 
       const actionBtn = document.createElement('button');
       actionBtn.className = 'follow-list-action';
@@ -3719,10 +3737,10 @@ async function adminLoadData(uid) {
   const snap = await db.ref(`users/${uid}`).once('value');
   const d = snap.val() || {};
   adminData = {
-    films:     Object.values(d.films     || {}),
-    series:    Object.values(d.series    || {}),
-    anime:     Object.values(d.anime     || {}),
-    watchlist: Object.values(d.watchlist || {}),
+    films:     Object.values(d.films     || {}).filter(i => i?.title),
+    series:    Object.values(d.series    || {}).filter(i => i?.title),
+    anime:     Object.values(d.anime     || {}).filter(i => i?.title),
+    watchlist: Object.values(d.watchlist || {}).filter(i => i?.title),
   };
   adminDataLoaded = true;
   adminRenderList();
@@ -3735,7 +3753,7 @@ async function adminSaveData() {
 
     for (const listName of ['films', 'series', 'anime', 'watchlist']) {
       const slimObj = {};
-      for (const item of adminData[listName]) {
+      for (const item of adminData[listName].filter(i => i?.title)) {
         const key    = catalogKey(item.title);
         slimObj[key] = extractPersonalFields(item);
         const shared = extractSharedFields(item);
