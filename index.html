@@ -53,6 +53,7 @@
             </div>
           </div>
           <button class="home-nav-btn" id="home-nav-profil">Mon profil</button>
+          <button class="home-nav-btn" id="home-nav-trending">En ce moment</button>
           <button class="home-nav-btn" id="home-nav-activity">Publications</button>
           <button class="home-nav-btn" id="home-nav-community">Communauté</button>
         </nav>
@@ -62,6 +63,7 @@
         </button>
         <div class="home-menu-dropdown hidden" id="home-menu-dropdown">
           <button class="home-menu-item" id="home-menu-profil">Mon profil</button>
+          <button class="home-menu-item" id="home-menu-trending">En ce moment</button>
           <button class="home-menu-item" id="home-menu-activity">Publications</button>
           <button class="home-menu-item" id="home-menu-community">Communauté</button>
         </div>
@@ -183,6 +185,29 @@
         </div>
       </div>
       <div id="community-grid" class="community-grid"></div>
+    </div>
+
+    <!-- ── Page En ce moment ── -->
+    <div id="trending-page" class="trending-page hidden">
+      <div class="trending-cover">
+        <img id="trending-bg" class="trending-cover-bg" src="" alt="" style="display:none" />
+      </div>
+      <div id="trending-loader" class="trending-loader hidden">
+        <div class="trending-spinner"></div>
+        <p class="trending-loader-text">Chargement…</p>
+      </div>
+      <div class="trending-section">
+        <h2 class="trending-section-title">Tendances de la semaine</h2>
+        <div id="trending-grid" class="trending-grid"></div>
+      </div>
+      <div class="trending-section">
+        <h2 class="trending-section-title">Prochainement</h2>
+        <div id="trending-upcoming-grid" class="trending-grid"></div>
+      </div>
+      <div class="trending-section">
+        <h2 class="trending-section-title">Gratuit en ce moment</h2>
+        <div id="trending-free-grid" class="trending-grid"></div>
+      </div>
     </div>
 
   </div>

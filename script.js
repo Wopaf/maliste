@@ -3385,10 +3385,12 @@ document.getElementById('home-strip-watchlist').addEventListener('click', () => 
 // ── Nav home ──────────────────────────────────────────────────
 const _homeContent   = document.querySelector('.home-content');
 const _communityPage = document.getElementById('community-page');
+const _trendingPage  = document.getElementById('trending-page');
 const _homeHeader    = document.querySelector('.home-header');
 
 function showHomeContent() {
   _communityPage.classList.add('hidden');
+  hideTrendingPage();
   hidePublicationsPage();
   _homeContent.style.display = '';
   _homeHeader.classList.remove('community-mode');
@@ -3404,11 +3406,30 @@ function showHomeContent() {
 }
 function showCommunityPage() {
   hidePublicationsPage();
+  hideTrendingPage();
   _homeContent.style.display = 'none';
   _homeHeader.classList.add('community-mode');
   _communityPage.classList.remove('hidden');
   window.scrollTo({ top: 0, behavior: 'instant' });
   loadCommunityPage();
+}
+function showTrendingPage() {
+  hidePublicationsPage();
+  _communityPage.classList.add('hidden');
+  _homeContent.style.display = 'none';
+  _homeHeader.classList.add('community-mode');
+  _trendingPage.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  loadTrendingPage();
+}
+function hideTrendingPage() {
+  const bg = document.getElementById('trending-bg');
+  if (bg) {
+    bg.classList.remove('visible');
+    setTimeout(() => { bg.src = ''; bg.style.display = 'none'; }, 800);
+  }
+  document.querySelectorAll('#trending-page .trending-section').forEach(el => el.classList.remove('visible'));
+  _trendingPage.classList.add('hidden');
 }
 
 (function() {
@@ -3465,11 +3486,18 @@ function showCommunityPage() {
     showCommunityPage();
     closeMenu();
   }
+  function handleTrending() {
+    setActive('trending');
+    showTrendingPage();
+    closeMenu();
+  }
 
   document.getElementById('home-nav-profil').addEventListener('click', handleProfil);
+  document.getElementById('home-nav-trending').addEventListener('click', handleTrending);
   document.getElementById('home-nav-activity').addEventListener('click', handleActivity);
   document.getElementById('home-nav-community').addEventListener('click', handleCommunity);
   document.getElementById('home-menu-profil').addEventListener('click', handleProfil);
+  document.getElementById('home-menu-trending').addEventListener('click', handleTrending);
   document.getElementById('home-menu-activity').addEventListener('click', handleActivity);
   document.getElementById('home-menu-community').addEventListener('click', handleCommunity);
 })();
@@ -3580,6 +3608,116 @@ document.getElementById('community-search-clear').addEventListener('click', () =
   document.getElementById('community-search-clear').classList.add('hidden');
   renderCommunityGrid(_communityEntries);
 });
+
+async function fetchAndImportTmdbList(endpoint) {
+  const json    = await adminTmdbFetch(endpoint);
+  const results = json.results || [];
+  const movies  = [];
+  for (const r of results) {
+    try {
+      const details = await adminTmdbFetch(`/movie/${r.id}?append_to_response=credits`);
+      const title   = details.title || r.title;
+      if (!title) continue;
+      const shared = { title };
+      shared.poster    = details.poster_path   ? `${TMDB_IMG}${details.poster_path}`                        : undefined;
+      shared.backdrop  = details.backdrop_path ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}` : undefined;
+      shared.tmdbId    = details.id;
+      shared.tmdbType  = 'movie';
+      shared.year        = details.release_date?.slice(0, 4);
+      shared.releaseDate = details.release_date || undefined;
+      shared.genre     = (details.genres || []).slice(0, 2).map(g => adminTranslateGenre(g.name));
+      const dir = details.credits?.crew?.find(c => c.job === 'Director');
+      shared.director  = dir?.name || '';
+      if (dir?.id) shared.directorId = dir.id;
+      shared.cast      = (details.credits?.cast || []).slice(0, 8).map(c => c.name);
+      if (details.runtime) {
+        const h = Math.floor(details.runtime / 60);
+        const m = details.runtime % 60;
+        shared.time = m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
+      }
+      Object.keys(shared).forEach(k => shared[k] === undefined && delete shared[k]);
+      await db.ref(`catalog/films/${catalogKey(title)}`).update(shared);
+      movies.push(shared);
+    } catch (e) { /* skip */ }
+  }
+  return movies;
+}
+
+async function loadTrendingPage() {
+  const loader       = document.getElementById('trending-loader');
+  const grid         = document.getElementById('trending-grid');
+  const upcomingGrid = document.getElementById('trending-upcoming-grid');
+  const freeGrid     = document.getElementById('trending-free-grid');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+  upcomingGrid.innerHTML = '';
+  freeGrid.innerHTML = '';
+  loader.classList.remove('hidden');
+  document.querySelectorAll('#trending-page .trending-section-title').forEach(el => el.style.visibility = 'hidden');
+
+  try {
+    const [trending, upcoming, free] = await Promise.all([
+      fetchAndImportTmdbList('/trending/movie/week'),
+      fetchAndImportTmdbList('/movie/upcoming?region=FR'),
+      fetchAndImportTmdbList('/discover/movie?watch_region=FR&with_watch_monetization_types=free%7Cads&sort_by=popularity.desc'),
+    ]);
+    loader.classList.add('hidden');
+    document.querySelectorAll('#trending-page .trending-section-title').forEach(el => el.style.visibility = '');
+    renderTrendingGrid(trending, 'trending-grid');
+    renderTrendingGrid(upcoming, 'trending-upcoming-grid');
+    renderTrendingGrid(free, 'trending-free-grid');
+    const bg = document.getElementById('trending-bg');
+    if (bg && trending[0]?.backdrop) {
+      bg.src = trending[0].backdrop;
+      bg.style.display = 'block';
+      requestAnimationFrame(() => bg.classList.add('visible'));
+    }
+    document.querySelectorAll('#trending-page .trending-section').forEach((el, i) => {
+      setTimeout(() => el.classList.add('visible'), i * 150);
+    });
+  } catch (e) {
+    loader.classList.add('hidden');
+    grid.innerHTML = '<p class="trending-empty">Erreur lors du chargement.</p>';
+  }
+}
+
+function enableHorizontalWheel(el) {
+  el.addEventListener('wheel', e => {
+    if (e.deltaY === 0) return;
+    e.preventDefault();
+    el.scrollBy({ left: e.deltaY * 1.5, behavior: 'smooth' });
+  }, { passive: false });
+}
+
+function renderTrendingGrid(movies, gridId = 'trending-grid') {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  enableHorizontalWheel(grid);
+
+  movies.forEach(movie => {
+    const card = document.createElement('div');
+    card.className = 'trending-card';
+    card.innerHTML = `
+      ${movie.poster
+        ? `<img class="trending-card-poster" src="${movie.poster}" alt="${movie.title}" loading="lazy" />`
+        : `<div class="trending-card-poster trending-card-poster-empty">${movie.title}</div>`}
+      <div class="trending-card-info">
+        <p class="trending-card-title">${movie.title}</p>
+        ${movie.releaseDate
+          ? `<p class="trending-card-year">${new Date(movie.releaseDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>`
+          : movie.year ? `<p class="trending-card-year">${movie.year}</p>` : ''}
+      </div>
+    `;
+    card.addEventListener('click', () => {
+      const key = catalogKey(movie.title);
+      catalogCache.films[key] = { ...(catalogCache.films[key] || {}), ...movie };
+      openModal(catalogCache.films[key], card);
+    });
+    grid.appendChild(card);
+  });
+}
 
 function exportToLetterboxd() {
   if (!films.length) { alert('Aucun film à exporter.'); return; }
