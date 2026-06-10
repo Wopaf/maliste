@@ -3695,6 +3695,12 @@ function renderTrendingGrid(movies, gridId = 'trending-grid') {
   if (!grid) return;
   grid.innerHTML = '';
   enableHorizontalWheel(grid);
+  const section = grid.closest('.trending-section');
+  if (section) {
+    grid.addEventListener('scroll', () => {
+      section.classList.toggle('scrolled-left', grid.scrollLeft > 10);
+    }, { passive: true });
+  }
 
   movies.forEach(movie => {
     const card = document.createElement('div');
@@ -5022,6 +5028,7 @@ async function loadPublicationsFeed() {
 function showPublicationsPage() {
   _homeContent.style.display = 'none';
   _communityPage.classList.add('hidden');
+  hideTrendingPage();
   _homeHeader.classList.add('community-mode');
   const pubPage = document.getElementById('publications-page');
   pubPage.classList.remove('hidden');
