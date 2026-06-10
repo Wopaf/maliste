@@ -1877,8 +1877,14 @@ function buildRecoSlots(container, isOwn) {
   const slots = document.createElement('div');
   slots.className = 'reco-slots-row';
 
+  const hasAny = recommendations.some(r => r != null);
+  if (!hasAny) slots.classList.add('reco-slots-row--empty');
+
+  let ghostShown = false;
   for (let i = 0; i < 6; i++) {
     const item = recommendations[i];
+    if (!item && ghostShown) continue;
+    if (!item) ghostShown = true;
     const slot = document.createElement('div');
     slot.className = 'reco-slot' + (item ? ' reco-slot-filled' : ' reco-slot-ghost');
 
@@ -1896,13 +1902,14 @@ function buildRecoSlots(container, isOwn) {
       if (isOwn) {
         slot.querySelector('.reco-remove-btn').addEventListener('click', async e => {
           e.stopPropagation();
-          recommendations[i] = null;
+          recommendations.splice(i, 1);
+          recommendations.push(null);
           await saveRecommendations();
           fillRecoSection();
         });
       }
     } else if (isOwn) {
-      slot.innerHTML = '';
+      slot.innerHTML = '<span class="reco-ghost-plus">+</span>';
       slot.style.cursor = 'pointer';
       slot.addEventListener('click', () => openRecoPicker(i));
     } else {
@@ -1915,33 +1922,45 @@ function buildRecoSlots(container, isOwn) {
 
     if (item) {
       const note = getNote(item.title);
+      const stars = getStars(item.title);
+      const noteEl = document.createElement('div');
+      noteEl.className = 'reco-slot-note';
       if (note) {
-        const noteEl = document.createElement('div');
-        noteEl.className = 'reco-slot-note';
         noteEl.style.cursor = 'pointer';
         noteEl.addEventListener('click', e => {
           e.stopPropagation();
           openNoteReadModal(item.title, note);
         });
-        const stars = getStars(item.title);
-        if (stars) {
-          const starsEl = document.createElement('p');
-          starsEl.className = 'reco-slot-note-stars';
-          starsEl.textContent = '★ ' + stars + ' / 10';
-          noteEl.appendChild(starsEl);
-        }
-        const textEl = document.createElement('p');
-        textEl.className = 'reco-slot-note-text';
-        textEl.textContent = note;
-        noteEl.appendChild(textEl);
-        wrap.appendChild(noteEl);
       }
+      const starsEl = document.createElement('p');
+      starsEl.className = 'reco-slot-note-stars';
+      starsEl.textContent = stars ? '★ ' + stars + ' / 10' : 'aucune note';
+      if (!stars) starsEl.style.color = '#444';
+      noteEl.appendChild(starsEl);
+      const textEl = document.createElement('p');
+      textEl.className = 'reco-slot-note-text';
+      textEl.textContent = note || 'pas encore de review';
+      if (!note) textEl.style.color = '#333';
+      noteEl.appendChild(textEl);
+      wrap.appendChild(noteEl);
     }
 
     slots.appendChild(wrap);
   }
 
   group.appendChild(slots);
+
+  if (!hasAny) {
+    const fullGhost = document.createElement('div');
+    fullGhost.className = 'reco-ghost-full reco-slot reco-slot-ghost';
+    if (isOwn) {
+      fullGhost.innerHTML = '<span class="reco-add-label">+ Ajouter</span>';
+      fullGhost.style.cursor = 'pointer';
+      fullGhost.addEventListener('click', () => openRecoPicker(0));
+    }
+    group.appendChild(fullGhost);
+  }
+
   container.appendChild(group);
 }
 
@@ -3507,23 +3526,7 @@ function renderCommunityGrid(entries) {
     card.className = 'community-full-card';
     card.style.animationDelay = `${i * 60}ms`;
 
-    // Cover
-    const coverEl = document.createElement('div');
-    coverEl.className = 'community-full-cover';
-    if (coverImage) {
-      const img = document.createElement('img');
-      img.src = coverImage; img.alt = '';
-      coverEl.appendChild(img);
-    }
-    if (accentColor) {
-      const grad = ACCENT_GRADIENTS[accentColor];
-      coverEl.style.background = grad
-        ? `linear-gradient(135deg, ${grad[0]}55, ${grad[1]}55)`
-        : accentColor + '44';
-    }
-    card.appendChild(coverEl);
-
-    // Avatar (chevauche la cover)
+    // Avatar
     const avatarDiv = document.createElement('div');
     avatarDiv.className = 'community-full-avatar';
     if (avatar) {
@@ -3547,28 +3550,10 @@ function renderCommunityGrid(entries) {
     const statsEl = document.createElement('div');
     statsEl.className = 'community-full-stats';
     statsEl.innerHTML = `
-      <span class="community-stat"><strong>${followersCount}</strong> abonné${followersCount !== 1 ? 's' : ''}</span>
-      <span class="community-stat-sep">·</span>
-      <span class="community-stat"><strong>${followingCount}</strong> abonnement${followingCount !== 1 ? 's' : ''}</span>
-      <span class="community-stat-sep">·</span>
       <span class="community-stat"><strong>${titlesCount}</strong> titre${titlesCount !== 1 ? 's' : ''}</span>
     `;
 
-    // Follow button — between name and stats
-    const followBtnCard = document.createElement('button');
-    followBtnCard.className = 'community-follow-btn';
-    followBtnCard.textContent = 'Suivre';
-    if (currentUser && uid !== currentUser.uid) {
-      updateFollowBtn(followBtnCard, uid);
-      followBtnCard.addEventListener('click', e => {
-        e.stopPropagation();
-        handleFollowClick(followBtnCard, uid);
-      });
-    } else {
-      followBtnCard.style.display = 'none';
-    }
-
-    card.append(avatarDiv, nameEl, statsEl, followBtnCard);
+    card.append(avatarDiv, nameEl, statsEl);
     card.addEventListener('click', () => {
       window.scrollTo({ top: 0, behavior: 'instant' });
       homePageFadeTransition(() => {

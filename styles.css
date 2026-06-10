@@ -3643,10 +3643,13 @@ header {
 .reco-slots-row {
   display: contents;
 }
-@media (max-width: 700px) {
+.reco-ghost-full { display: none; }
+@media (max-width: 900px) {
   #home-reco-list { flex-direction: column; }
   .reco-group + .reco-group { border-left: none; padding-left: 0; border-top: none; padding-top: 0; }
-  .reco-slots-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .reco-slots-row { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .reco-slots-row--empty { display: none; }
+  .reco-ghost-full { display: flex; flex: 1; aspect-ratio: unset; height: 72px; }
 }
 .reco-slot-wrap {
   flex: 1;
@@ -3654,6 +3657,7 @@ header {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  max-width: 160px;
 }
 .reco-slot {
   width: 100%;
@@ -3715,6 +3719,7 @@ header {
 }
 .reco-slot-ghost:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.28); }
 .reco-add-label { font-size: 12px; color: #555; font-weight: 600; }
+.reco-ghost-plus { font-size: 32px; font-weight: 300; color: #444; line-height: 1; }
 .reco-empty-label { font-size: 12px; color: #333; }
 .reco-poster {
   width: 100%; height: 100%;
@@ -4655,7 +4660,7 @@ header {
 }
 .community-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 14px;
 }
 @keyframes community-card-in {
@@ -4668,39 +4673,15 @@ header {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: #141414;
+  border: 1px solid rgba(255,255,255,0);
+  background: transparent;
   border-radius: 14px;
-  overflow: hidden;
-  padding-bottom: 16px;
+  padding: 16px 8px;
   transition: background 0.2s, border-color 0.2s;
   animation: community-card-in 0.35s ease both;
 }
 .community-full-card:hover {
   border-color: rgba(255,255,255,0.25);
-}
-.community-full-cover {
-  width: 100%;
-  height: 155px;
-  flex-shrink: 0;
-  background: rgba(255,255,255,0.06);
-  position: relative;
-  overflow: hidden;
-}
-.community-full-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  filter: blur(10px);
-  transform: scale(1.08);
-}
-.community-full-cover::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, transparent 0%, #141414 100%);
-  pointer-events: none;
 }
 .community-full-avatar {
   width: 100px;
@@ -4714,7 +4695,7 @@ header {
   border: 3px solid #141414;
   background: #1e1e1e;
   flex-shrink: 0;
-  margin-top: -100px;
+  margin-top: 0px;
 }
 .community-full-avatar img {
   position: absolute;
@@ -5881,8 +5862,11 @@ header {
     text-align: center;
   }
 
-  .community-grid {
-    grid-template-columns: 1fr;
-  }
+}
 
+@media (max-width: 900px) {
+  .reco-slot-wrap { flex-direction: row; align-items: stretch; max-width: none; }
+  .reco-slot-wrap .reco-slot { width: 70px; flex-shrink: 0; aspect-ratio: 2/3; }
+  .reco-slot-wrap .reco-slot-ghost { width: 100%; aspect-ratio: unset; height: 64px; }
+  .reco-slot-wrap .reco-slot-note { flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
 }
