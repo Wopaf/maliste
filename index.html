@@ -53,9 +53,8 @@
             </div>
           </div>
           <button class="home-nav-btn" id="home-nav-profil">Mon profil</button>
-          <button class="home-nav-btn" id="home-nav-trending">En ce moment</button>
-          <button class="home-nav-btn" id="home-nav-activity">Publications</button>
-          <button class="home-nav-btn" id="home-nav-community">Communauté</button>
+          <button class="home-nav-btn" id="home-nav-trending">À l'affiche</button>
+          <button class="home-nav-btn" id="home-nav-activity">Communauté</button>
         </nav>
         <div class="home-menu-overlay" id="home-menu-overlay"></div>
         <button class="home-menu-btn" id="home-menu-btn" aria-label="Menu">
@@ -63,9 +62,8 @@
         </button>
         <div class="home-menu-dropdown hidden" id="home-menu-dropdown">
           <button class="home-menu-item" id="home-menu-profil">Mon profil</button>
-          <button class="home-menu-item" id="home-menu-trending">En ce moment</button>
-          <button class="home-menu-item" id="home-menu-activity">Publications</button>
-          <button class="home-menu-item" id="home-menu-community">Communauté</button>
+          <button class="home-menu-item" id="home-menu-trending">À l'affiche</button>
+          <button class="home-menu-item" id="home-menu-activity">Communauté</button>
         </div>
       </div>
       <div class="home-profile-bar">
@@ -147,6 +145,7 @@
 
     <!-- ── Page Publications ── -->
     <div id="publications-page" class="publications-page hidden">
+      <div class="pub-layout">
       <div class="pub-wrap">
         <div class="pub-composer" id="pub-composer">
           <div class="pub-composer-right">
@@ -167,7 +166,20 @@
           <p class="pub-empty">Chargement…</p>
         </div>
       </div>
+      <aside class="pub-sidebar">
+        <div class="pub-sidebar-search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="pub-sidebar-search" class="pub-sidebar-search" placeholder="Rechercher un utilisateur…" autocomplete="off" />
+        </div>
+        <div id="pub-sidebar-users" class="pub-sidebar-users"></div>
+        <div class="pub-sidebar-trending" id="pub-sidebar-trending" style="display:none">
+          <p class="pub-sidebar-trending-label">Tendances</p>
+          <div id="pub-sidebar-keywords" class="pub-sidebar-keywords"></div>
+        </div>
+      </aside>
+      </div>
     </div>
+
 
     <!-- ── Page Communauté ── -->
     <div id="community-page" class="community-page hidden">
@@ -187,7 +199,7 @@
       <div id="community-grid" class="community-grid"></div>
     </div>
 
-    <!-- ── Page En ce moment ── -->
+    <!-- ── Page À l'affiche ── -->
     <div id="trending-page" class="trending-page hidden">
       <div class="trending-cover">
         <img id="trending-bg" class="trending-cover-bg" src="" alt="" style="display:none" />
@@ -905,5 +917,25 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="script.js"></script>
+
+  <!-- Bottom sheet mobile (publications) -->
+  <button id="pub-sheet-btn" class="pub-sheet-btn" style="display:none" aria-label="Utilisateurs & Tendances">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  </button>
+  <div id="pub-sheet-overlay" class="pub-sheet-overlay"></div>
+  <div id="pub-sheet" class="pub-sheet">
+    <div class="pub-sheet-handle"></div>
+    <div class="pub-sheet-content">
+      <div class="pub-sidebar-search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="pub-mobile-search" class="pub-sidebar-search" placeholder="Rechercher un utilisateur…" autocomplete="off" />
+      </div>
+      <div id="pub-mobile-users" class="pub-sidebar-users"></div>
+      <div class="pub-sidebar-trending" id="pub-mobile-trending" style="display:none">
+        <p class="pub-sidebar-trending-label">Tendances</p>
+        <div id="pub-mobile-keywords" class="pub-sidebar-keywords"></div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

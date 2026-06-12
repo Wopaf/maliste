@@ -3495,119 +3495,11 @@ function hideTrendingPage() {
   document.getElementById('home-nav-profil').addEventListener('click', handleProfil);
   document.getElementById('home-nav-trending').addEventListener('click', handleTrending);
   document.getElementById('home-nav-activity').addEventListener('click', handleActivity);
-  document.getElementById('home-nav-community').addEventListener('click', handleCommunity);
   document.getElementById('home-menu-profil').addEventListener('click', handleProfil);
   document.getElementById('home-menu-trending').addEventListener('click', handleTrending);
   document.getElementById('home-menu-activity').addEventListener('click', handleActivity);
-  document.getElementById('home-menu-community').addEventListener('click', handleCommunity);
 })();
 
-let _communityLoaded = false;
-let _communityEntries = [];
-
-function loadCommunityPage() {
-  const grid = document.getElementById('community-grid');
-  if (!grid) return;
-  if (_communityLoaded) { renderCommunityGrid(_communityEntries); return; }
-  grid.innerHTML = '<p class="community-empty">Chargement…</p>';
-
-  db.ref('profiles').once('value').then(async profilesSnap => {
-    const profiles = profilesSnap.val() || {};
-    const uids = Object.keys(profiles);
-    const entries = await Promise.all(uids.map(async uid => {
-      const p    = profiles[uid];
-      const snap = await db.ref(`users/${uid}`).once('value');
-      const u    = snap.val() || {};
-      const titlesCount    = Object.values(u.films  || {}).length
-                           + Object.values(u.series || {}).length
-                           + Object.values(u.anime  || {}).length;
-      const followersCount = Object.keys(u.followers || {}).length;
-      const followingCount = Object.keys(u.following || {}).length;
-      const recoRaw = u.recommendations;
-      const recos = Array.isArray(recoRaw)
-        ? recoRaw
-        : (recoRaw ? [...(recoRaw.films || []), ...(recoRaw.series || [])] : []);
-      return {
-        uid, name: p.name || '?', avatar: p.avatar || null,
-        coverImage: p.coverImage || null, accentColor: p.accentColor || null,
-        titlesCount, followersCount, followingCount, recos,
-      };
-    }));
-    entries.sort((a, b) => b.titlesCount - a.titlesCount);
-    _communityEntries = entries;
-    _communityLoaded  = true;
-    renderCommunityGrid(entries);
-  });
-}
-
-function renderCommunityGrid(entries) {
-  const grid   = document.getElementById('community-grid');
-  const search = document.getElementById('community-search').value.toLowerCase().trim();
-  const filtered = search ? entries.filter(e => e.name.toLowerCase().includes(search)) : entries;
-  grid.innerHTML = '';
-  if (!filtered.length) {
-    grid.innerHTML = '<p class="community-empty">Aucun utilisateur trouvé</p>';
-    return;
-  }
-  filtered.forEach(({ uid, name, avatar, coverImage, accentColor, titlesCount, followersCount, followingCount, recos }, i) => {
-    const card = document.createElement('div');
-    card.className = 'community-full-card';
-    card.style.animationDelay = `${i * 60}ms`;
-
-    // Avatar
-    const avatarDiv = document.createElement('div');
-    avatarDiv.className = 'community-full-avatar';
-    if (avatar) {
-      const img = document.createElement('img');
-      img.src = avatar; img.alt = name;
-      avatarDiv.appendChild(img);
-    } else {
-      const span = document.createElement('span');
-      span.className = 'community-full-initials';
-      span.textContent = name[0].toUpperCase();
-      if (accentColor) avatarDiv.style.background = accentColor + '33';
-      avatarDiv.appendChild(span);
-    }
-
-    // Nom
-    const nameEl = document.createElement('span');
-    nameEl.className = 'community-full-name';
-    nameEl.textContent = name;
-
-    // Stats
-    const statsEl = document.createElement('div');
-    statsEl.className = 'community-full-stats';
-    statsEl.innerHTML = `
-      <span class="community-stat"><strong>${titlesCount}</strong> titre${titlesCount !== 1 ? 's' : ''}</span>
-    `;
-
-    card.append(avatarDiv, nameEl, statsEl);
-    card.addEventListener('click', () => {
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      homePageFadeTransition(() => {
-        showHomeContent();
-        document.querySelectorAll('.home-nav-btn, .home-menu-item').forEach(b => b.classList.remove('active'));
-        const profilNav  = document.getElementById('home-nav-profil');
-        const profilMenu = document.getElementById('home-menu-profil');
-        if (profilNav)  profilNav.classList.add('active');
-        if (profilMenu) profilMenu.classList.add('active');
-        switchToUser(uid);
-      });
-    });
-    grid.appendChild(card);
-  });
-}
-
-document.getElementById('community-search').addEventListener('input', e => {
-  const clearBtn = document.getElementById('community-search-clear');
-  clearBtn.classList.toggle('hidden', !e.target.value);
-  renderCommunityGrid(_communityEntries);
-});
-document.getElementById('community-search-clear').addEventListener('click', () => {
-  document.getElementById('community-search').value = '';
-  document.getElementById('community-search-clear').classList.add('hidden');
-  renderCommunityGrid(_communityEntries);
-});
 
 async function fetchAndImportTmdbList(endpoint) {
   const json    = await adminTmdbFetch(endpoint);
@@ -4627,6 +4519,9 @@ let _pubListener    = null;
 let _pubInitedComp  = false;
 let _pubFirstRender = true;
 let _pubFollowingUids = new Set();
+let _pubAllPosts      = [];
+let _pubKeywordFilter = null;
+let _pubLastSnap      = null;
 
 function relativeTime(ts) {
   const diff = Date.now() - ts;
@@ -4659,20 +4554,55 @@ function renderPublicationsFeed(snap) {
   const feed = document.getElementById('pub-feed');
   if (!feed) return;
 
-  const allPosts = [];
-  snap.forEach(child => { allPosts.push({ id: child.key, ...child.val() }); });
+  if (snap) {
+    _pubLastSnap = snap;
+    const allPosts = [];
+    snap.forEach(child => { allPosts.push({ id: child.key, ...child.val() }); });
+    _pubAllPosts = allPosts;
+  }
+
+  // Update filter banner
+  let banner = document.getElementById('pub-filter-banner');
+  if (_pubKeywordFilter) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'pub-filter-banner';
+      banner.className = 'pub-filter-banner';
+      feed.parentNode.insertBefore(banner, feed);
+    }
+    banner.innerHTML = `<span>Filtre : <strong>${_pubKeywordFilter}</strong></span><button class="pub-filter-clear" title="Effacer le filtre">✕</button>`;
+    banner.querySelector('.pub-filter-clear').addEventListener('click', () => {
+      _pubKeywordFilter = null;
+      computeTrendingKeywords();
+      renderPublicationsFeed(null);
+    });
+  } else {
+    if (banner) banner.remove();
+  }
 
   // Filtrer : seulement ses propres posts + ceux des comptes suivis
   const myUid = currentUser?.uid;
-  const posts = allPosts.filter(p => p.uid === myUid || _pubFollowingUids.has(p.uid));
+  let posts = _pubAllPosts.filter(p => p.uid === myUid || _pubFollowingUids.has(p.uid));
 
   posts.sort((a, b) => b.createdAt - a.createdAt);
   posts.splice(50);
 
+  // Filtrer par mot-clé si actif
+  if (_pubKeywordFilter) {
+    const kw = _pubKeywordFilter.toLowerCase();
+    posts = posts.filter(p => {
+      const inText  = (p.content || '').toLowerCase().includes(kw);
+      const inFilms = (p.films || []).some(f => (f.title || '').toLowerCase().includes(kw));
+      return inText || inFilms;
+    });
+  }
+
   if (!posts.length) {
-    feed.innerHTML = allPosts.length
-      ? '<p class="pub-empty">Suivez des utilisateurs pour voir leurs publications ici.</p>'
-      : '<p class="pub-empty">Aucune publication pour l\'instant. Soyez le premier !</p>';
+    feed.innerHTML = _pubKeywordFilter
+      ? `<p class="pub-empty">Aucune publication pour « ${_pubKeywordFilter} ».</p>`
+      : (_pubAllPosts.length
+          ? '<p class="pub-empty">Suivez des utilisateurs pour voir leurs publications ici.</p>'
+          : '<p class="pub-empty">Aucune publication pour l\'instant. Soyez le premier !</p>');
     return;
   }
 
@@ -5036,6 +4966,271 @@ function showPublicationsPage() {
   _pubFirstRender = true;
   initPublicationsComposer();
   loadPublicationsFeed();
+  loadPubSidebar();
+  showPubSheetBtn();
+}
+
+let _communityLoaded  = false;
+let _communityEntries = [];
+
+function loadCommunityPage() {
+  const grid = document.getElementById('community-grid');
+  if (!grid) return;
+  if (_communityLoaded) { renderCommunityGrid(_communityEntries); return; }
+  grid.innerHTML = '<p class="community-empty">Chargement…</p>';
+
+  db.ref('profiles').once('value').then(async profilesSnap => {
+    const profiles = profilesSnap.val() || {};
+    const uids = Object.keys(profiles);
+    const entries = await Promise.all(uids.map(async uid => {
+      const p    = profiles[uid];
+      const snap = await db.ref(`users/${uid}`).once('value');
+      const u    = snap.val() || {};
+      const titlesCount    = Object.values(u.films  || {}).length
+                           + Object.values(u.series || {}).length
+                           + Object.values(u.anime  || {}).length;
+      const followersCount = Object.keys(u.followers || {}).length;
+      const followingCount = Object.keys(u.following || {}).length;
+      const recoRaw = u.recommendations;
+      const recos = Array.isArray(recoRaw)
+        ? recoRaw
+        : (recoRaw ? [...(recoRaw.films || []), ...(recoRaw.series || [])] : []);
+      return {
+        uid, name: p.name || '?', avatar: p.avatar || null,
+        coverImage: p.coverImage || null, accentColor: p.accentColor || null,
+        titlesCount, followersCount, followingCount, recos,
+      };
+    }));
+    entries.sort((a, b) => b.titlesCount - a.titlesCount);
+    _communityEntries = entries;
+    _communityLoaded  = true;
+    renderCommunityGrid(entries);
+  });
+}
+
+function renderCommunityGrid(entries) {
+  const grid   = document.getElementById('community-grid');
+  const search = document.getElementById('community-search').value.toLowerCase().trim();
+  const filtered = search ? entries.filter(e => e.name.toLowerCase().includes(search)) : entries;
+  grid.innerHTML = '';
+  if (!filtered.length) {
+    grid.innerHTML = '<p class="community-empty">Aucun utilisateur trouvé</p>';
+    return;
+  }
+  filtered.forEach(({ uid, name, avatar, accentColor, titlesCount }, i) => {
+    const card = document.createElement('div');
+    card.className = 'community-full-card';
+    card.style.animationDelay = `${i * 60}ms`;
+
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'community-full-avatar';
+    if (avatar) {
+      const img = document.createElement('img');
+      img.src = avatar; img.alt = name;
+      avatarDiv.appendChild(img);
+    } else {
+      const span = document.createElement('span');
+      span.className = 'community-full-initials';
+      span.textContent = name[0].toUpperCase();
+      if (accentColor) avatarDiv.style.background = accentColor + '33';
+      avatarDiv.appendChild(span);
+    }
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'community-full-name';
+    nameEl.textContent = name;
+
+    const statsEl = document.createElement('div');
+    statsEl.className = 'community-full-stats';
+    statsEl.innerHTML = `
+      <span class="community-stat"><strong>${titlesCount}</strong> titre${titlesCount !== 1 ? 's' : ''}</span>
+    `;
+
+    card.append(avatarDiv, nameEl, statsEl);
+    card.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      homePageFadeTransition(() => {
+        showHomeContent();
+        document.querySelectorAll('.home-nav-btn, .home-menu-item').forEach(b => b.classList.remove('active'));
+        const profilNav  = document.getElementById('home-nav-profil');
+        const profilMenu = document.getElementById('home-menu-profil');
+        if (profilNav)  profilNav.classList.add('active');
+        if (profilMenu) profilMenu.classList.add('active');
+        switchToUser(uid);
+      });
+    });
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('community-search').addEventListener('input', e => {
+  const clearBtn = document.getElementById('community-search-clear');
+  clearBtn.classList.toggle('hidden', !e.target.value);
+  renderCommunityGrid(_communityEntries);
+});
+document.getElementById('community-search-clear').addEventListener('click', () => {
+  document.getElementById('community-search').value = '';
+  document.getElementById('community-search-clear').classList.add('hidden');
+  renderCommunityGrid(_communityEntries);
+});
+
+let _pubSidebarUsers = [];
+
+async function loadPubSidebar() {
+  const container = document.getElementById('pub-sidebar-users');
+  if (!container) return;
+  if (_pubSidebarUsers.length) { renderPubSidebar(''); computeTrendingKeywords(); return; }
+
+  container.innerHTML = '<p style="font-size:12px;color:#444;padding:8px 10px">Chargement…</p>';
+  const [profilesSnap] = await Promise.all([db.ref('profiles').once('value')]);
+  const profiles = profilesSnap.val() || {};
+
+  _pubSidebarUsers = await Promise.all(Object.entries(profiles).map(async ([uid, p]) => {
+    const snap = await db.ref(`users/${uid}`).once('value');
+    const u = snap.val() || {};
+    return {
+      uid,
+      name: p.name || 'Utilisateur',
+      avatar: p.avatar || null,
+      initials: (p.name || 'U')[0].toUpperCase(),
+      titlesCount: Object.values(u.films || {}).length + Object.values(u.series || {}).length + Object.values(u.anime || {}).length,
+    };
+  }));
+
+  _pubSidebarUsers.sort((a, b) => b.titlesCount - a.titlesCount);
+  renderPubSidebar('');
+
+  document.getElementById('pub-sidebar-search').addEventListener('input', e => {
+    renderPubSidebar(e.target.value.toLowerCase().trim());
+  });
+
+  computeTrendingKeywords();
+}
+
+function computeTrendingKeywords() {
+  const section  = document.getElementById('pub-sidebar-trending');
+  const keywords = document.getElementById('pub-sidebar-keywords');
+  if (!section || !keywords) return;
+
+  // Use posts already loaded by the feed listener (full access)
+  const posts = _pubAllPosts.length ? _pubAllPosts.slice(-30) : [];
+
+  // Build known actors set from catalog cache
+  const knownActors = new Set();
+  ['films', 'series', 'anime'].forEach(type => {
+    Object.values(catalogCache[type] || {}).forEach(item => {
+      (item.cast || []).forEach(a => knownActors.add(a.toLowerCase()));
+    });
+  });
+
+  const scores = {};
+  const bump   = (word, pts) => { scores[word] = (scores[word] || 0) + pts; };
+
+  const stopWords = new Set([
+    'alors','aussi','avec','bien','cela','cette','comme','dans','depuis',
+    'donc','dont','elle','elles','encore','entre','faire','leur','leurs',
+    'mais','même','moins','nous','plus','pour','quand','quel','quelle','sans',
+    'suis','très','tout','tous','toute','toutes','trois','votre','vous','vraiment',
+    'avoir','après','avant','autre','autres','celui','comment','super','vraiment',
+    'genre','films','série','anime','vraiment','tellement','toujours','jamais',
+  ]);
+
+  posts.forEach(post => {
+    // 1. Films/séries liés — score 3 pour le titre complet, + 2 par mot significatif du titre
+    (post.films || []).forEach(f => {
+      if (!f.title) return;
+      bump(f.title.toLowerCase().trim(), 2);
+      f.title.toLowerCase()
+        .replace(/[^a-zàâäéèêëîïôùûüç\s'-]/gi, ' ')
+        .split(/\s+/)
+        .filter(w => w.length >= 4 && !stopWords.has(w))
+        .forEach(w => bump(w, 2));
+    });
+
+    // 2. Texte libre
+    const words = (post.content || '')
+      .toLowerCase()
+      .replace(/[^a-zàâäéèêëîïôùûüç\s'-]/gi, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 4);
+
+    words.forEach(w => {
+      if (stopWords.has(w)) return;
+      // 3. Acteur connu (mot unique) — score 2
+      if (knownActors.has(w)) { bump(w, 2); return; }
+      // 4. Mot >= 4 lettres — score 1
+      bump(w, 1);
+    });
+
+    // Acteurs multi-mots (ex: "tom hanks")
+    const text = (post.content || '').toLowerCase();
+    knownActors.forEach(actor => {
+      if (actor.includes(' ') && text.includes(actor)) bump(actor, 2);
+    });
+  });
+
+  const top5 = Object.entries(scores)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  if (!top5.length) return;
+
+  const fillKeywords = (containerId, sectionId) => {
+    const kw = document.getElementById(containerId);
+    const sc = document.getElementById(sectionId);
+    if (!kw || !sc) return;
+    kw.innerHTML = '';
+    top5.forEach(([word]) => {
+      const el = document.createElement('div');
+      el.className = 'pub-sidebar-keyword';
+      if (_pubKeywordFilter === word) el.classList.add('active');
+      el.innerHTML = `<span class="pub-sidebar-keyword-text">${word.charAt(0).toUpperCase() + word.slice(1)}</span>`;
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', () => {
+        _pubKeywordFilter = _pubKeywordFilter === word ? null : word;
+        closePubSheet();
+        computeTrendingKeywords();
+        applyPubKeywordFilter();
+      });
+      kw.appendChild(el);
+    });
+    sc.style.display = '';
+  };
+
+  fillKeywords('pub-sidebar-keywords', 'pub-sidebar-trending');
+  fillKeywords('pub-mobile-keywords',  'pub-mobile-trending');
+}
+
+function applyPubKeywordFilter() {
+  _pubFirstRender = true;
+  renderPublicationsFeed(null);
+}
+
+function renderPubSidebar(query) {
+  const filtered = query
+    ? _pubSidebarUsers.filter(u => u.name.toLowerCase().includes(query))
+    : _pubSidebarUsers;
+
+  ['pub-sidebar-users', 'pub-mobile-users'].forEach(id => {
+    const container = document.getElementById(id);
+    if (!container) return;
+    container.innerHTML = '';
+    filtered.forEach(u => {
+      const el = document.createElement('div');
+      el.className = 'pub-sidebar-user';
+      el.innerHTML = `
+        <div class="pub-sidebar-avatar">
+          ${u.avatar ? `<img src="${u.avatar}" alt="" />` : u.initials}
+        </div>
+        <span class="pub-sidebar-name">${u.name}</span>
+      `;
+      el.addEventListener('click', () => {
+        closePubSheet();
+        homePageFadeTransition(() => { showHomeContent(); switchToUser(u.uid); });
+      });
+      container.appendChild(el);
+    });
+  });
 }
 
 function hidePublicationsPage() {
@@ -5048,7 +5243,46 @@ function hidePublicationsPage() {
     _pubListener = null;
   }
   _pubFollowingUids = new Set();
+  _pubKeywordFilter = null;
+  const banner = document.getElementById('pub-filter-banner');
+  if (banner) banner.remove();
+  hidePubSheetBtn();
+  closePubSheet();
 }
+
+function showPubSheetBtn() {
+  const btn = document.getElementById('pub-sheet-btn');
+  if (!btn) return;
+  btn.style.display = window.matchMedia('(max-width: 900px)').matches ? 'flex' : 'none';
+}
+
+function hidePubSheetBtn() {
+  const btn = document.getElementById('pub-sheet-btn');
+  if (btn) btn.style.display = 'none';
+}
+
+function openPubSheet() {
+  document.getElementById('pub-sheet-overlay')?.classList.add('open');
+  document.getElementById('pub-sheet')?.classList.add('open');
+}
+
+function closePubSheet() {
+  document.getElementById('pub-sheet-overlay')?.classList.remove('open');
+  document.getElementById('pub-sheet')?.classList.remove('open');
+}
+
+(function initPubSheet() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn     = document.getElementById('pub-sheet-btn');
+    const overlay = document.getElementById('pub-sheet-overlay');
+    const input   = document.getElementById('pub-mobile-search');
+    if (btn)     btn.addEventListener('click', openPubSheet);
+    if (overlay) overlay.addEventListener('click', closePubSheet);
+    if (input)   input.addEventListener('input', e => {
+      renderPubSidebar(e.target.value.toLowerCase().trim());
+    });
+  });
+})();
 
 // ── Modal sélection films pour post ──────────────────────────
 
