@@ -82,6 +82,17 @@
       </div>
     </header>
     <div class="home-content">
+      <div class="search-bar home-search-bar" id="home-search-bar">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="home-search" placeholder="Rechercher un film, un acteur, un réalisateur…" autocomplete="off" />
+        <button class="search-clear" id="home-search-clear" aria-label="Effacer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
       <section class="home-carousel" id="home-section-watchlist">
         <div class="home-carousel-hdr">
           <div class="home-carousel-title-group">
@@ -112,17 +123,7 @@
         </section>
       </div>
       <hr class="home-divider">
-      <section class="home-carousel" id="home-section-reco">
-        <div class="home-carousel-hdr">
-          <h2 class="home-carousel-title">Recommandations</h2>
-        </div>
-        <div id="home-reco-list"></div>
-      </section>
-      <hr class="home-divider">
       <section class="home-carousel" id="home-section-activity">
-        <div class="home-carousel-hdr">
-          <h2 class="home-carousel-title">Activité récente</h2>
-        </div>
         <div id="home-activity-list"></div>
       </section>
       <section class="home-migrate-section hidden" id="home-migrate-section" style="display:none!important">
@@ -365,6 +366,8 @@
 
   <div class="user-menu" id="user-menu">
       <button class="user-menu-item" id="edit-profile-btn">Editer mon Profil</button>
+      <button class="user-menu-item" id="user-menu-followers-btn">Abonnés</button>
+      <button class="user-menu-item" id="user-menu-following-btn">Abonnements</button>
       <div class="user-menu-separator"></div>
       <button class="user-menu-logout" id="logout-btn">Se déconnecter</button>
     </div>
@@ -402,7 +405,10 @@
           </div>
         </div>
         <p class="modal-series-info" id="modal-series-info"></p>
-        <p class="modal-cast" id="modal-cast"></p>
+        <div class="modal-review-card modal-cast-card" id="modal-cast-card">
+          <p class="modal-review-card-title">Casting</p>
+          <p class="modal-cast" id="modal-cast"></p>
+        </div>
 
         <div class="modal-review-card" id="modal-review-card">
           <p class="modal-review-card-title">Ma Review</p>
@@ -436,6 +442,9 @@
         <div class="modal-bottom-actions">
           <button class="modal-copy-btn hidden" id="modal-copy-btn">Copier dans ma liste</button>
           <button class="modal-copy-btn hidden" id="modal-watchlist-btn">+ Ma Watchlist</button>
+          <button class="modal-copy-btn hidden" id="modal-add-watchlist-btn">Ajouter à ma Watchlist</button>
+          <button class="modal-copy-btn hidden" id="modal-add-films-btn">Ajouter à ma liste de films</button>
+          <button class="modal-copy-btn hidden" id="modal-add-series-btn">Ajouter à ma liste de séries</button>
           <div class="modal-transfer-actions hidden" id="modal-transfer-actions">
             <button class="modal-transfer-btn" id="modal-transfer-films"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM235.5-272Q125-344 61-462q-5-9-7.5-18.5T51-500q0-10 2.5-19.5T61-538q64-118 174.5-190T480-800q134 0 244.5 72T899-538q5 9 7.5 18.5T909-500q0 10-2.5 19.5T899-462q-64 118-174.5 190T480-200q-134 0-244.5-72ZM480-500Zm207.5 160.5Q782-399 832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280q113 0 207.5-59.5Z"/></svg> Marquer ce Film comme vu</button>
             <button class="modal-transfer-btn" id="modal-transfer-series"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM235.5-272Q125-344 61-462q-5-9-7.5-18.5T51-500q0-10 2.5-19.5T61-538q64-118 174.5-190T480-800q134 0 244.5 72T899-538q5 9 7.5 18.5T909-500q0 10-2.5 19.5T899-462q-64 118-174.5 190T480-200q-134 0-244.5-72ZM480-500Zm207.5 160.5Q782-399 832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280q113 0 207.5-59.5Z"/></svg> Marquer cette Série comme vue</button>
@@ -772,26 +781,6 @@
     </div>
   </div>
 
-  <!-- Modal picker recommandations -->
-  <div class="admin-modal hidden" id="reco-picker-modal">
-    <div class="modal-box reco-picker-box">
-      <div class="modal-header">
-        <h2>Choisir un titre</h2>
-        <button class="modal-close-btn" id="reco-picker-close">✕</button>
-      </div>
-      <div class="modal-body" style="padding:16px 24px;">
-        <p style="font-size:13px;color:rgba(255,255,255,0.45);margin-bottom:14px;line-height:1.5;">Ajoutez ici un film ou une série que vous souhaitez mettre en recommandation, pour faire découvrir vos titres préférés aux utilisateurs visitant votre profil.</p>
-        <div class="search-bar" id="reco-search-bar">
-          <input type="text" id="reco-search-input" placeholder="Rechercher un film ou une série…" autocomplete="off" />
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </div>
-        <div id="reco-picker-results" class="reco-picker-results"></div>
-      </div>
-    </div>
-  </div>
-
   <!-- Trailers fetch overlay -->
   <div class="import-overlay hidden" id="trailers-overlay">
     <div class="import-box">
@@ -910,6 +899,19 @@
         </button>
       </div>
       <div class="follow-list-modal-body" id="follow-list-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Modal filmographie (recherche TMDB) -->
+  <div class="admin-modal hidden" id="person-search-modal">
+    <div class="modal-box person-search-box">
+      <div class="modal-header">
+        <h2 id="person-search-title"></h2>
+        <button class="modal-close-btn" id="person-search-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="person-search-grid" class="tmdb-results-grid"></div>
+      </div>
     </div>
   </div>
 
