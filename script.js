@@ -41,7 +41,6 @@ let _followersCount = 0;
 let _followingCount = 0;
 let anime     = [];
 let watchlist = [];
-let recommendations = [null, null, null, null, null, null];
 let _dataReady = false;
 
 let currentRenderData = [];
@@ -231,13 +230,6 @@ async function loadUserData(uid) {
       return { ...cat, ...u, _fbKey: fbKey };
     });
 
-  const rec = d.recommendations || {};
-  if (Array.isArray(rec)) {
-    recommendations = [...rec, null, null, null, null, null, null].slice(0, 6);
-  } else {
-    const toArr = v => { const a = Array.isArray(v) ? v : Object.values(v || {}); return [...a, null, null, null].slice(0, 3); };
-    recommendations = [...toArr(rec.films), ...toArr(rec.series)];
-  }
   currentRecFilm   = d.recommendationFilm   || null;
   currentRecSeries = d.recommendationSeries || null;
   currentViewName  = d.name || '';
@@ -452,6 +444,15 @@ homeUserBtn.addEventListener('click', e => {
 
 document.addEventListener('click', () => userMenu.classList.remove('open'));
 userMenu.addEventListener('click', e => e.stopPropagation());
+
+document.getElementById('user-menu-followers-btn').addEventListener('click', () => {
+  userMenu.classList.remove('open');
+  openFollowListModal('followers');
+});
+document.getElementById('user-menu-following-btn').addEventListener('click', () => {
+  userMenu.classList.remove('open');
+  openFollowListModal('following');
+});
 
 // ── Avatar ───────────────────────────────────────────────────
 function setHomeHeaderBg(url) {
@@ -1409,7 +1410,6 @@ function populateHomePage() {
   fillStrip('home-strip-watchlist', [...watchlist], watchlist.length, true, 10, 2);
   fillCommunityStrip();
   fillActivitySection();
-  fillRecoSection();
   showMigrateSection();
 
   const setBadge = (id, count) => { const el = document.getElementById(id); if (el) el.textContent = count; };
@@ -1795,8 +1795,7 @@ function fillActivitySection() {
 
   const recent = [...films, ...series, ...anime]
     .filter(i => i.addedAt)
-    .sort((a, b) => b.addedAt.localeCompare(a.addedAt))
-    .slice(0, 10);
+    .sort((a, b) => b.addedAt.localeCompare(a.addedAt));
 
   if (section) section.style.display = '';
   if (!recent.length) {
@@ -1805,7 +1804,28 @@ function fillActivitySection() {
   }
 
   container.innerHTML = '';
+  let lastYear = null, lastMonth = null;
   recent.forEach(item => {
+    const addedDate = new Date(item.addedAt);
+    const year = addedDate.getFullYear();
+    const month = addedDate.getMonth();
+    if (year !== lastYear) {
+      const yearEl = document.createElement('h3');
+      yearEl.className = 'activity-year-header';
+      yearEl.textContent = year;
+      container.appendChild(yearEl);
+      lastYear = year;
+      lastMonth = null;
+    }
+    if (month !== lastMonth) {
+      const monthName = addedDate.toLocaleDateString('fr-FR', { month: 'long' });
+      const monthEl = document.createElement('p');
+      monthEl.className = 'activity-month-header';
+      monthEl.textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+      container.appendChild(monthEl);
+      lastMonth = month;
+    }
+
     const isSeries = !!(item.seasons || item.episodes);
     const typeLabel = isSeries ? 'Série' : 'Film';
     const el = document.createElement('div');
@@ -1866,173 +1886,6 @@ function fillActivitySection() {
     container.appendChild(el);
   });
 }
-
-// ── Recommandations ──────────────────────────────────────────
-let _recoPickerSlot = null;
-
-function buildRecoSlots(container, isOwn) {
-  const group = document.createElement('div');
-  group.className = 'reco-group';
-
-  const slots = document.createElement('div');
-  slots.className = 'reco-slots-row';
-
-  const hasAny = recommendations.some(r => r != null);
-  if (!hasAny) slots.classList.add('reco-slots-row--empty');
-
-  let ghostShown = false;
-  for (let i = 0; i < 6; i++) {
-    const item = recommendations[i];
-    if (!item && ghostShown) continue;
-    if (!item) ghostShown = true;
-    const slot = document.createElement('div');
-    slot.className = 'reco-slot' + (item ? ' reco-slot-filled' : ' reco-slot-ghost');
-
-    if (item) {
-      slot.innerHTML = `
-        ${item.poster ? `<img class="reco-poster" src="${item.poster}" alt="" />` : `<div class="reco-poster reco-poster-empty"></div>`}
-        ${isOwn ? `<button class="reco-remove-btn">✕</button>` : ''}
-      `;
-      slot.style.cursor = 'pointer';
-      slot.addEventListener('click', e => {
-        if (e.target.closest('.reco-remove-btn')) return;
-        const found = [...films, ...series, ...anime].find(f => f.title === item.title);
-        if (found) openModal(found, slot);
-      });
-      if (isOwn) {
-        slot.querySelector('.reco-remove-btn').addEventListener('click', async e => {
-          e.stopPropagation();
-          recommendations.splice(i, 1);
-          recommendations.push(null);
-          await saveRecommendations();
-          fillRecoSection();
-        });
-      }
-    } else if (isOwn) {
-      slot.innerHTML = '<span class="reco-ghost-plus">+</span>';
-      slot.style.cursor = 'pointer';
-      slot.addEventListener('click', () => openRecoPicker(i));
-    } else {
-      slot.innerHTML = `<span class="reco-empty-label">—</span>`;
-    }
-
-    const wrap = document.createElement('div');
-    wrap.className = 'reco-slot-wrap';
-    wrap.appendChild(slot);
-
-    if (item) {
-      const note = getNote(item.title);
-      const stars = getStars(item.title);
-      const noteEl = document.createElement('div');
-      noteEl.className = 'reco-slot-note';
-      if (note) {
-        noteEl.style.cursor = 'pointer';
-        noteEl.addEventListener('click', e => {
-          e.stopPropagation();
-          openNoteReadModal(item.title, note);
-        });
-      }
-      const starsEl = document.createElement('p');
-      starsEl.className = 'reco-slot-note-stars';
-      starsEl.textContent = stars ? '★ ' + stars + ' / 10' : 'aucune note';
-      if (!stars) starsEl.style.color = '#444';
-      noteEl.appendChild(starsEl);
-      const textEl = document.createElement('p');
-      textEl.className = 'reco-slot-note-text';
-      textEl.textContent = note || 'pas encore de review';
-      if (!note) textEl.style.color = '#333';
-      noteEl.appendChild(textEl);
-      wrap.appendChild(noteEl);
-    }
-
-    slots.appendChild(wrap);
-  }
-
-  group.appendChild(slots);
-
-  if (!hasAny) {
-    const fullGhost = document.createElement('div');
-    fullGhost.className = 'reco-ghost-full reco-slot reco-slot-ghost';
-    if (isOwn) {
-      fullGhost.innerHTML = '<span class="reco-add-label">+ Ajouter</span>';
-      fullGhost.style.cursor = 'pointer';
-      fullGhost.addEventListener('click', () => openRecoPicker(0));
-    }
-    group.appendChild(fullGhost);
-  }
-
-  container.appendChild(group);
-}
-
-function fillRecoSection() {
-  const container = document.getElementById('home-reco-list');
-  if (!container) return;
-  const isOwn = currentUser && currentViewUid === currentUser.uid;
-
-  const titleEl = document.querySelector('#home-section-reco .home-carousel-title');
-  if (titleEl) {
-    titleEl.textContent = currentViewName ? `Recommandations de ${currentViewName}` : 'Recommandations';
-  }
-
-  container.innerHTML = '';
-  buildRecoSlots(container, isOwn);
-}
-
-function openRecoPicker(slotIndex) {
-  _recoPickerSlot = slotIndex;
-  const modal = document.getElementById('reco-picker-modal');
-  const input = document.getElementById('reco-search-input');
-  modal.classList.remove('hidden');
-  input.value = '';
-  renderRecoPickerResults('');
-  setTimeout(() => input.focus(), 50);
-}
-
-function renderRecoPickerResults(query) {
-  const resultsEl = document.getElementById('reco-picker-results');
-  const pool = [...films, ...series, ...anime];
-  const q = query.toLowerCase().trim();
-  const filtered = (q ? pool.filter(i => i.title.toLowerCase().includes(q)) : pool).slice(0, 10);
-
-  if (!filtered.length) { resultsEl.innerHTML = '<p class="tmdb-msg">Aucun résultat.</p>'; return; }
-
-  resultsEl.innerHTML = '';
-  filtered.forEach(item => {
-    const card = document.createElement('div');
-    card.className = 'reco-picker-card';
-    card.innerHTML = `
-      ${item.poster ? `<img src="${item.poster}" alt="" />` : `<div class="reco-picker-card-no-poster"></div>`}
-      <div class="reco-picker-card-info">
-        <p class="reco-picker-card-title">${item.title}</p>
-        <p class="reco-picker-card-year">${item.year || ''}</p>
-      </div>
-    `;
-    card.addEventListener('click', async () => {
-      recommendations[_recoPickerSlot] = { title: item.title, poster: item.poster || null, year: item.year || null };
-      document.getElementById('reco-picker-modal').classList.add('hidden');
-      await saveRecommendations();
-      fillRecoSection();
-    });
-    resultsEl.appendChild(card);
-  });
-}
-
-async function saveRecommendations() {
-  if (!currentUser) return;
-  await db.ref(`users/${currentUser.uid}/recommendations`).set(recommendations);
-}
-
-document.getElementById('reco-picker-close').addEventListener('click', () => {
-  document.getElementById('reco-picker-modal').classList.add('hidden');
-});
-document.getElementById('reco-search-input').addEventListener('input', e => {
-  renderRecoPickerResults(e.target.value);
-});
-document.getElementById('reco-picker-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('reco-picker-modal')) {
-    document.getElementById('reco-picker-modal').classList.add('hidden');
-  }
-});
 
 function fillCommunityStrip() {
   const strip = document.getElementById('home-strip-community');
@@ -2755,6 +2608,264 @@ searchInput.addEventListener("focus", () => {
   if (searchInput.value.trim()) showSuggestions(searchInput.value.trim());
 });
 
+// ── Home search (TMDB) ──────────────────────────────────────────
+const homeSearchInput = document.getElementById('home-search');
+const homeSearchClear = document.getElementById('home-search-clear');
+const homeSuggestionList = document.createElement('ul');
+homeSuggestionList.className = 'search-suggestions';
+document.body.appendChild(homeSuggestionList);
+
+function positionHomeSuggestions() {
+  const rect = homeSearchInput.parentElement.getBoundingClientRect();
+  homeSuggestionList.style.top = (rect.bottom + 6) + 'px';
+  if (window.innerWidth <= 700) {
+    homeSuggestionList.style.left  = '12px';
+    homeSuggestionList.style.right = '12px';
+    homeSuggestionList.style.width = '';
+  } else {
+    homeSuggestionList.style.left  = rect.left + 'px';
+    homeSuggestionList.style.right = (window.innerWidth - rect.right) + 'px';
+    homeSuggestionList.style.width = '';
+  }
+}
+window.addEventListener('resize', () => {
+  if (homeSuggestionList.style.display === 'block') positionHomeSuggestions();
+});
+
+function updateHomeSearchClear() {
+  homeSearchInput.closest('.search-bar').classList.toggle('has-value', homeSearchInput.value.length > 0);
+}
+
+const TMDB_SUGGESTION_LABEL = { movie: 'Film', tv: 'Série', person: 'Personne' };
+let _homeSearchToken     = 0;
+let _homeSearchDebounce  = null;
+let _homeSuggestionItems = [];
+
+async function fetchTmdbSuggestions(query) {
+  const json = await adminTmdbFetch(`/search/multi?query=${encodeURIComponent(query)}&include_adult=false`);
+  return (json.results || [])
+    .filter(r => r.media_type === 'movie' || r.media_type === 'tv' || r.media_type === 'person')
+    .slice(0, 8)
+    .map(r => ({
+      id:   r.id,
+      type: r.media_type,
+      text: r.media_type === 'movie' ? r.title : r.name,
+      year: r.media_type === 'movie' ? r.release_date?.slice(0, 4) : r.media_type === 'tv' ? r.first_air_date?.slice(0, 4) : '',
+    }));
+}
+
+function renderHomeSuggestions(items) {
+  _homeSuggestionItems = items;
+  if (!items.length) {
+    homeSuggestionList.innerHTML = '<li class="suggestion-item suggestion-loading">Aucun résultat.</li>';
+    positionHomeSuggestions();
+    homeSuggestionList.style.display = 'block';
+    return;
+  }
+  homeSuggestionList.innerHTML = items.map((item, i) =>
+    `<li class="suggestion-item" data-index="${i}">
+      <span>${item.text}${item.year ? ` (${item.year})` : ''}</span>
+      <span class="suggestion-type">${TMDB_SUGGESTION_LABEL[item.type]}</span>
+    </li>`
+  ).join('');
+  positionHomeSuggestions();
+  homeSuggestionList.style.display = 'block';
+
+  homeSuggestionList.querySelectorAll('.suggestion-item').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      selectHomeSuggestion(_homeSuggestionItems[parseInt(el.dataset.index)]);
+    });
+  });
+}
+
+async function showHomeSuggestions(query) {
+  if (!query || query.length < 2) {
+    _homeSuggestionItems = [];
+    homeSuggestionList.style.display = 'none';
+    return;
+  }
+  const token = ++_homeSearchToken;
+  homeSuggestionList.innerHTML = '<li class="suggestion-item suggestion-loading">Recherche…</li>';
+  positionHomeSuggestions();
+  homeSuggestionList.style.display = 'block';
+  try {
+    const items = await fetchTmdbSuggestions(query);
+    if (token !== _homeSearchToken) return;
+    renderHomeSuggestions(items);
+  } catch (e) {
+    if (token !== _homeSearchToken) return;
+    homeSuggestionList.innerHTML = '<li class="suggestion-item suggestion-loading">Erreur de recherche.</li>';
+  }
+}
+
+function selectHomeSuggestion(item) {
+  if (!item) return;
+  homeSuggestionList.style.display = 'none';
+  homeSearchInput.value = '';
+  updateHomeSearchClear();
+  if (item.type === 'person') openPersonFilmography(item.id, item.text);
+  else openTmdbItemModal(item.id, item.type);
+}
+
+homeSearchInput.addEventListener('input', () => {
+  updateHomeSearchClear();
+  clearTimeout(_homeSearchDebounce);
+  const query = homeSearchInput.value.trim();
+  _homeSearchDebounce = setTimeout(() => showHomeSuggestions(query), 350);
+});
+homeSearchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    clearTimeout(_homeSearchDebounce);
+    if (_homeSuggestionItems.length) selectHomeSuggestion(_homeSuggestionItems[0]);
+  }
+});
+homeSearchInput.addEventListener('blur', () => {
+  setTimeout(() => { homeSuggestionList.style.display = 'none'; }, 150);
+});
+homeSearchInput.addEventListener('focus', () => {
+  if (_homeSuggestionItems.length && homeSearchInput.value.trim()) {
+    positionHomeSuggestions();
+    homeSuggestionList.style.display = 'block';
+  }
+});
+homeSearchClear.addEventListener('click', () => {
+  homeSearchInput.value = '';
+  updateHomeSearchClear();
+  homeSuggestionList.style.display = 'none';
+  homeSearchInput.focus();
+});
+
+// ── TMDB item modal / person filmography ─────────────────────
+async function importCastPeople(castRaw) {
+  await Promise.all(castRaw.filter(p => p.name).map(async person => {
+    const key = catalogKey(person.name);
+    if (catalogCache.people[key]?.profileImage) return;
+    const existing = (await db.ref(`catalog/people/${key}`).once('value')).val();
+    if (existing?.profileImage) { catalogCache.people[key] = existing; return; }
+    const personData = {
+      name:         person.name,
+      tmdbId:       person.id,
+      profileImage: person.profile_path ? `https://image.tmdb.org/t/p/w185${person.profile_path}` : null,
+    };
+    await db.ref(`catalog/people/${key}`).set(personData);
+    catalogCache.people[key] = personData;
+  }));
+}
+
+async function fetchTmdbItem(id, type) {
+  const [details, videosData] = await Promise.all([
+    adminTmdbFetch(`/${type}/${id}?append_to_response=credits`),
+    adminTmdbFetchVideos(type, id).catch(() => null),
+  ]);
+  const isMovie = type === 'movie';
+  const castRaw = (details.credits?.cast || []).slice(0, 8);
+  const item = {
+    tmdbId:   details.id,
+    tmdbType: type,
+    title:    isMovie ? details.title : details.name,
+    poster:   details.poster_path   ? TMDB_IMG + details.poster_path : null,
+    backdrop: details.backdrop_path ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}` : null,
+    year:     (isMovie ? details.release_date : details.first_air_date)?.slice(0, 4),
+    genre:    (details.genres || []).slice(0, 2).map(g => adminTranslateGenre(g.name)),
+    cast:     castRaw.map(c => c.name),
+  };
+  const dir = details.credits?.crew?.find(c => c.job === 'Director');
+  if (dir) { item.director = dir.name; item.directorId = dir.id; }
+  if (isMovie) {
+    if (details.runtime) {
+      const h = Math.floor(details.runtime / 60);
+      const m = details.runtime % 60;
+      item.time = m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
+    }
+  } else {
+    item.episodes = details.number_of_episodes;
+    item.seasons  = details.number_of_seasons;
+    item.duration = (details.episode_run_time && details.episode_run_time[0]) || 30;
+  }
+  const videoResults = videosData?.results || [];
+  const trailer = videoResults.find(v => v.type === 'Trailer' && v.site === 'YouTube') || videoResults.find(v => v.site === 'YouTube');
+  if (trailer) item.youtubeId = trailer.key;
+  await importCastPeople(castRaw);
+  return item;
+}
+
+async function openTmdbItemModal(id, type, triggerEl) {
+  try {
+    const item   = await fetchTmdbItem(id, type);
+    const bucket = type === 'movie' ? catalogCache.films : catalogCache.series;
+    const key    = catalogKey(item.title);
+    bucket[key]  = { ...(bucket[key] || {}), ...item };
+    openModal(bucket[key], triggerEl);
+  } catch (e) { /* ignore */ }
+}
+
+function closePersonSearchModal() {
+  document.getElementById('person-search-modal').classList.add('hidden');
+}
+document.getElementById('person-search-close').addEventListener('click', closePersonSearchModal);
+document.getElementById('person-search-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('person-search-modal')) closePersonSearchModal();
+});
+
+async function openPersonFilmography(id, name) {
+  const modal   = document.getElementById('person-search-modal');
+  const titleEl = document.getElementById('person-search-title');
+  const grid    = document.getElementById('person-search-grid');
+  titleEl.textContent = name;
+  grid.innerHTML = '<p class="tmdb-msg">Chargement…</p>';
+  modal.classList.remove('hidden');
+
+  try {
+    const json = await adminTmdbFetch(`/person/${id}/combined_credits`);
+    const seen = new Set();
+    const credits = [
+      ...(json.cast || []),
+      ...(json.crew || []).filter(c => c.job === 'Director'),
+    ].filter(c =>
+      (c.media_type === 'movie' || c.media_type === 'tv') &&
+      !seen.has(`${c.media_type}-${c.id}`) &&
+      seen.add(`${c.media_type}-${c.id}`)
+    );
+
+    credits.sort((a, b) => {
+      const da = a.release_date || a.first_air_date || '';
+      const dbb = b.release_date || b.first_air_date || '';
+      return dbb.localeCompare(da);
+    });
+
+    if (!credits.length) {
+      grid.innerHTML = '<p class="tmdb-msg">Aucun film ou série trouvé.</p>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    credits.forEach(c => {
+      const isMovie      = c.media_type === 'movie';
+      const creditTitle  = isMovie ? c.title : c.name;
+      const year         = (isMovie ? c.release_date : c.first_air_date)?.slice(0, 4);
+      const poster       = c.poster_path ? TMDB_IMG + c.poster_path : null;
+      const card = document.createElement('div');
+      card.className = 'tmdb-card';
+      card.innerHTML = `
+        <img src="${poster || ''}" alt="" onerror="this.style.background='#222';this.src=''" />
+        <div class="tmdb-card-info">
+          <p class="tmdb-card-title">${creditTitle}</p>
+          <p class="tmdb-card-year">${year || ''}</p>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        closePersonSearchModal();
+        openTmdbItemModal(c.id, isMovie ? 'movie' : 'tv', card);
+      });
+      grid.appendChild(card);
+    });
+  } catch (e) {
+    grid.innerHTML = '<p class="tmdb-msg">Erreur lors du chargement.</p>';
+  }
+}
+
 // ── Modal ──────────────────────────────────────────────────
 const modalBackdrop = document.getElementById('modal-backdrop');
 const modalEl       = document.getElementById('modal-card');
@@ -2800,11 +2911,12 @@ function openModal(item, triggerEl) {
 
   const dirEl = document.getElementById('modal-director');
   const castEl = document.getElementById('modal-cast');
+  const castCardEl = document.getElementById('modal-cast-card');
   const seriesInfoEl = document.getElementById('modal-series-info');
 
   if (item.episodes) {
     dirEl.style.display = 'none';
-    castEl.style.display = 'none';
+    castCardEl.style.display = 'none';
     seriesInfoEl.style.display = '';
     const lines = [];
     if (item.seasons) lines.push(`${item.seasons} saison${item.seasons > 1 ? 's' : ''}`);
@@ -2815,7 +2927,6 @@ function openModal(item, triggerEl) {
     seriesInfoEl.innerHTML = lines.join('<br>');
   } else {
     dirEl.style.display = '';
-    castEl.style.display = '';
     seriesInfoEl.style.display = 'none';
     if (item.director) {
       const dirName = personLink(item.director);
@@ -2827,6 +2938,7 @@ function openModal(item, triggerEl) {
       dirEl.innerHTML = '';
     }
     if (item.cast && item.cast.length) {
+      castCardEl.style.display = '';
       castEl.innerHTML = '';
       const wrap = document.createElement('div');
       wrap.className = 'modal-cast-wrap';
@@ -2854,6 +2966,7 @@ function openModal(item, triggerEl) {
       wrap.appendChild(scroller);
       castEl.appendChild(wrap);
     } else {
+      castCardEl.style.display = 'none';
       castEl.innerHTML = '';
     }
   }
@@ -2896,6 +3009,8 @@ function openModal(item, triggerEl) {
   const noteExisting = document.getElementById('modal-note-existing');
   const noteEditBtn  = document.getElementById('modal-note-edit-btn');
   const reviewCard   = document.getElementById('modal-review-card');
+  const isInSeenList = [...films, ...series, ...anime].some(i => i.title === item.title);
+  reviewCard.style.display = isInSeenList ? '' : 'none';
   if (noteBtn) {
     noteBtn.style.display      = isOwn ? '' : 'none';
     if (noteExisting) noteExisting.style.display = isOwn ? '' : 'none';
@@ -2951,6 +3066,31 @@ function openModal(item, triggerEl) {
     seriesBtn.style.display = isFilm   ? 'none' : '';
     filmsBtn.onclick  = () => transferFromWatchlist(item, 'films');
     seriesBtn.onclick = () => transferFromWatchlist(item, 'series');
+  }
+
+  // Titre absent de mes listes (résultat TMDB, ou présent seulement dans la watchlist) —
+  // ignoré si on est déjà dans le cas "Marquer comme vu" ci-dessus (onglet Watchlist)
+  const addWatchlistBtn = document.getElementById('modal-add-watchlist-btn');
+  const addFilmsBtn     = document.getElementById('modal-add-films-btn');
+  const addSeriesBtn    = document.getElementById('modal-add-series-btn');
+  const isSeriesItem    = !!(item.seasons || item.episodes);
+  const isInWatchlist   = watchlist.some(i => i.title === item.title);
+  const showAddButtons  = isOwn && !isInSeenList && !isOwnWatchlist;
+
+  addWatchlistBtn.classList.toggle('hidden', !(showAddButtons && !isInWatchlist));
+  if (showAddButtons && !isInWatchlist) {
+    addWatchlistBtn.textContent = 'Ajouter à ma Watchlist';
+    addWatchlistBtn.classList.remove('copied');
+    addWatchlistBtn.onclick = () => addToMyWatchlist(item, addWatchlistBtn);
+  }
+
+  addFilmsBtn.classList.toggle('hidden', !(showAddButtons && !isSeriesItem));
+  addSeriesBtn.classList.toggle('hidden', !(showAddButtons && isSeriesItem));
+  if (showAddButtons) {
+    const addBtn = isSeriesItem ? addSeriesBtn : addFilmsBtn;
+    addBtn.classList.remove('copied');
+    addBtn.textContent = isSeriesItem ? 'Ajouter à ma liste de séries' : 'Ajouter à ma liste de films';
+    addBtn.onclick = () => addItemToMyPersonalList(item, isSeriesItem ? 'series' : 'films', addBtn);
   }
 
   const posterImg    = document.getElementById('modal-poster-img');
@@ -3030,13 +3170,44 @@ async function addToMyWatchlist(item, btn) {
   const personal = extractPersonalFields(item);
   personal.addedAt = personal.addedAt || new Date().toISOString();
   delete personal.stars;
+  const bucket = (item.seasons || item.episodes) ? 'series' : 'films';
   await Promise.all([
     db.ref(`users/${currentUser.uid}/watchlist/${key}`).set(personal),
-    db.ref(`catalog/films/${key}`).update(extractSharedFields(item)),
+    db.ref(`catalog/${bucket}/${key}`).update(extractSharedFields(item)),
   ]);
+  if (currentViewUid === currentUser.uid) {
+    watchlist = [...watchlist, { ...item, ...personal }];
+    refreshViews();
+  }
   btn.textContent = '✓ Ajouté !';
   btn.classList.add('copied');
   btn.onclick = null;
+}
+
+async function addItemToMyPersonalList(item, arrName, btn) {
+  if (!currentUser) return;
+  const key  = catalogKey(item.title);
+  const snap = await db.ref(`users/${currentUser.uid}/${arrName}/${key}`).once('value');
+  if (snap.exists()) {
+    btn.textContent = 'Déjà dans ta liste';
+    btn.classList.add('copied');
+    return;
+  }
+  const personal = extractPersonalFields(item);
+  personal.addedAt = personal.addedAt || new Date().toISOString();
+  delete personal.stars;
+  await Promise.all([
+    db.ref(`users/${currentUser.uid}/${arrName}/${key}`).set(personal),
+    db.ref(`catalog/${arrName}/${key}`).update(extractSharedFields(item)),
+    db.ref(`users/${currentUser.uid}/watchlist/${key}`).remove(),
+  ]);
+  watchlist = watchlist.filter(i => i.title !== item.title);
+  if (arrName === 'films') films = [...films, { ...item, ...personal }];
+  else series = [...series, { ...item, ...personal }];
+  btn.textContent = '✓ Ajouté !';
+  btn.classList.add('copied');
+  btn.onclick = null;
+  refreshViews();
 }
 
 async function copyItemToMyList(item, btn) {
@@ -4991,14 +5162,10 @@ function loadCommunityPage() {
                            + Object.values(u.anime  || {}).length;
       const followersCount = Object.keys(u.followers || {}).length;
       const followingCount = Object.keys(u.following || {}).length;
-      const recoRaw = u.recommendations;
-      const recos = Array.isArray(recoRaw)
-        ? recoRaw
-        : (recoRaw ? [...(recoRaw.films || []), ...(recoRaw.series || [])] : []);
       return {
         uid, name: p.name || '?', avatar: p.avatar || null,
         coverImage: p.coverImage || null, accentColor: p.accentColor || null,
-        titlesCount, followersCount, followingCount, recos,
+        titlesCount, followersCount, followingCount,
       };
     }));
     entries.sort((a, b) => b.titlesCount - a.titlesCount);
