@@ -1342,6 +1342,9 @@ function triggerStaggerAnim(delay = 0) {
       el.style.opacity        = '';
       el.style.animationDelay = `${i * 100}ms`;
       el.classList.add('home-launch-in');
+      // Libère opacity/transform une fois l'entrée jouée, sinon l'animation
+      // (fill-mode: both) reste "active" et bloque les transitions CSS ultérieures.
+      el.addEventListener('animationend', () => el.classList.remove('home-launch-in'), { once: true });
     });
   };
   delay > 0 ? setTimeout(run, delay) : requestAnimationFrame(() => requestAnimationFrame(run));
@@ -2608,6 +2611,23 @@ searchInput.addEventListener("focus", () => {
   if (searchInput.value.trim()) showSuggestions(searchInput.value.trim());
 });
 
+// ── Titre d'accueil aléatoire ──────────────────────────────────
+const HOME_SEARCH_TITLES = [
+  'Que la Force soit avec toi',
+  'Vers l\'infini et au-delà !',
+  'Après tout, demain est un autre jour',
+  'Veux-tu jouer à un jeu ?',
+  'Rosebud',
+  'Suis le lapin blanc',
+  'La vie trouve toujours un chemin',
+  'Nous ne sommes pas seuls',
+  'Un pour tous, tous pour un',
+];
+const homeSearchTitleEl = document.getElementById('home-search-title');
+if (homeSearchTitleEl) {
+  homeSearchTitleEl.textContent = HOME_SEARCH_TITLES[Math.floor(Math.random() * HOME_SEARCH_TITLES.length)];
+}
+
 // ── Home search (TMDB) ──────────────────────────────────────────
 const homeSearchInput = document.getElementById('home-search');
 const homeSearchClear = document.getElementById('home-search-clear');
@@ -2617,16 +2637,10 @@ document.body.appendChild(homeSuggestionList);
 
 function positionHomeSuggestions() {
   const rect = homeSearchInput.parentElement.getBoundingClientRect();
-  homeSuggestionList.style.top = (rect.bottom + 6) + 'px';
-  if (window.innerWidth <= 700) {
-    homeSuggestionList.style.left  = '12px';
-    homeSuggestionList.style.right = '12px';
-    homeSuggestionList.style.width = '';
-  } else {
-    homeSuggestionList.style.left  = rect.left + 'px';
-    homeSuggestionList.style.right = (window.innerWidth - rect.right) + 'px';
-    homeSuggestionList.style.width = '';
-  }
+  homeSuggestionList.style.top   = (rect.bottom + 6) + 'px';
+  homeSuggestionList.style.left  = rect.left + 'px';
+  homeSuggestionList.style.right = (window.innerWidth - rect.right) + 'px';
+  homeSuggestionList.style.width = '';
 }
 window.addEventListener('resize', () => {
   if (homeSuggestionList.style.display === 'block') positionHomeSuggestions();
@@ -2682,7 +2696,9 @@ function renderHomeSuggestions(items) {
 async function showHomeSuggestions(query) {
   if (!query || query.length < 2) {
     _homeSuggestionItems = [];
-    homeSuggestionList.style.display = 'none';
+    homeSuggestionList.innerHTML = '<li class="suggestion-item suggestion-loading">Rechercher un film, un acteur, un réalisateur…</li>';
+    positionHomeSuggestions();
+    homeSuggestionList.style.display = 'block';
     return;
   }
   const token = ++_homeSearchToken;
@@ -2722,19 +2738,36 @@ homeSearchInput.addEventListener('keydown', e => {
   }
 });
 homeSearchInput.addEventListener('blur', () => {
-  setTimeout(() => { homeSuggestionList.style.display = 'none'; }, 150);
+  homeSuggestionList.style.display = 'none';
+  document.querySelector('.home-header')?.classList.remove('search-focused');
+  document.querySelector('.home-content')?.classList.remove('search-active');
 });
 homeSearchInput.addEventListener('focus', () => {
-  if (_homeSuggestionItems.length && homeSearchInput.value.trim()) {
-    positionHomeSuggestions();
-    homeSuggestionList.style.display = 'block';
+  document.querySelector('.home-header')?.classList.add('search-focused');
+  document.querySelector('.home-content')?.classList.add('search-active');
+  const query = homeSearchInput.value.trim();
+  // Attendre la fin de l'animation de rétrécissement du header avant de
+  // positionner le dropdown, sinon il se cale sur la position pré-animation.
+  if (query.length < 2) {
+    // Trop court pour chercher (ou vide), mais on affiche quand même une indication.
+    setTimeout(() => {
+      if (document.activeElement !== homeSearchInput) return;
+      showHomeSuggestions(query);
+    }, 220);
+  } else if (_homeSuggestionItems.length) {
+    setTimeout(() => {
+      if (document.activeElement !== homeSearchInput) return;
+      positionHomeSuggestions();
+      homeSuggestionList.style.display = 'block';
+    }, 220);
   }
 });
 homeSearchClear.addEventListener('click', () => {
   homeSearchInput.value = '';
   updateHomeSearchClear();
   homeSuggestionList.style.display = 'none';
-  homeSearchInput.focus();
+  homeSearchInput.blur();
+  document.querySelector('.home-header')?.classList.remove('search-focused');
 });
 
 // ── TMDB item modal / person filmography ─────────────────────
