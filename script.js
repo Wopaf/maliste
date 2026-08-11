@@ -41,6 +41,7 @@ let _followersCount = 0;
 let _followingCount = 0;
 let anime     = [];
 let watchlist = [];
+let customLists = [];
 let _dataReady = false;
 
 let currentRenderData = [];
@@ -193,7 +194,7 @@ let currentRecSeries = null;
 
 async function loadUserData(uid) {
   _dataReady = false;
-  films = []; series = []; anime = []; watchlist = [];
+  films = []; series = []; anime = []; watchlist = []; customLists = [];
 
   const [userSnap, catFilmsSnap, catSeriesSnap, catAnimeSnap, catPeopleSnap] = await Promise.all([
     db.ref(`users/${uid}`).once('value'),
@@ -229,13 +230,17 @@ async function loadUserData(uid) {
       const cat = catalogCache.films[key] || catalogCache.series[key] || catalogCache.anime[key] || {};
       return { ...cat, ...u, _fbKey: fbKey };
     });
+  customLists = Object.entries(d.customLists || {})
+    .filter(([, l]) => l?.name)
+    .map(([id, l]) => ({ id, name: l.name, createdAt: l.createdAt || '', items: l.items || {} }))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   currentRecFilm   = d.recommendationFilm   || null;
   currentRecSeries = d.recommendationSeries || null;
   currentViewName  = d.name || '';
   _dataReady = true;
   loadDisplayPrefs(uid);
-  buildGenreFilters(currentTab === 'films' ? films : currentTab === 'watchlist' ? watchlist : [...series, ...anime]);
+  buildGenreFilters(getTabData(currentTab));
   renderRecommendation();
   if (!homePage.classList.contains('hidden')) populateHomePage();
   _tryRender();
@@ -963,8 +968,8 @@ async function updateHomeHeaderForUid(uid) {
   const filmsTitle    = document.getElementById('home-strip-films-title');
   const seriesTitle   = document.getElementById('home-strip-series-title');
   const watchTitle    = document.getElementById('home-strip-watchlist-title');
-  if (filmsTitle)  filmsTitle.textContent  = 'Ses Films';
-  if (seriesTitle) seriesTitle.textContent = 'Ses Séries';
+  if (filmsTitle)  filmsTitle.textContent  = 'Ses films visionnés';
+  if (seriesTitle) seriesTitle.textContent = 'Ses séries visionnées';
   if (watchTitle)  watchTitle.textContent  = 'Sa Watchlist';
 }
 
@@ -991,8 +996,8 @@ function restoreOwnHomeHeader() {
     const filmsTitle  = document.getElementById('home-strip-films-title');
     const seriesTitle = document.getElementById('home-strip-series-title');
     const watchTitle  = document.getElementById('home-strip-watchlist-title');
-    if (filmsTitle)  filmsTitle.textContent  = 'Films';
-    if (seriesTitle) seriesTitle.textContent = 'Séries';
+    if (filmsTitle)  filmsTitle.textContent  = 'Films visionnés';
+    if (seriesTitle) seriesTitle.textContent = 'Séries visionnées';
     if (watchTitle)  watchTitle.textContent  = 'Ma Watchlist';
     const homeNav     = document.querySelector('.home-nav');
     const homeLogo    = document.querySelector('.home-logo');
@@ -1376,18 +1381,28 @@ function showHomePage(animate = false) {
   }, animate === true ? 300 : 0);
 }
 
-function switchTab(tab) {
+function getTabData(tab) {
+  if (tab === 'films')     return films;
+  if (tab === 'watchlist') return watchlist;
+  if (tab === 'custom') {
+    const list = customLists.find(l => l.id === currentCustomListId);
+    return list ? resolveCustomListItems(list) : [];
+  }
+  return [...series, ...anime];
+}
+
+function switchTab(tab, customListId = null) {
   currentTab = tab;
+  currentCustomListId = tab === 'custom' ? customListId : null;
   currentGenre = 'Tous';
   currentStarFilter = 'all';
   searchInput.value = '';
-  const data = currentTab === 'films' ? films : currentTab === 'watchlist' ? watchlist : [...series, ...anime];
-  buildGenreFilters(data);
+  buildGenreFilters(getTabData(currentTab));
   renderRecommendation();
   render();
 }
 
-function navigateToApp(tab) {
+function navigateToApp(tab, customListId = null) {
   homePage.classList.add('hidden');
   mainApp.classList.remove('hidden');
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -1403,14 +1418,15 @@ function navigateToApp(tab) {
     void mainCol.offsetWidth;
     mainCol.classList.add('content-fade-in');
   }
-  if (tab) switchTab(tab);
+  if (tab) switchTab(tab, customListId);
   else render();
 }
 
 function populateHomePage() {
-  fillStrip('home-strip-films',     [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)), films.length, false, 6);
-  fillStrip('home-strip-series',    [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length, false, 6);
-  fillStrip('home-strip-watchlist', [...watchlist], watchlist.length, true, 10, 2);
+  fillStrip('home-strip-films',     [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)), films.length, 'films', window.innerWidth <= 700 ? 6 : 10, 2);
+  fillStrip('home-strip-series',    [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length, 'series', window.innerWidth <= 700 ? 6 : 10, 2);
+  fillStrip('home-strip-watchlist', [...watchlist].sort((a, b) => (b.addedAt ?? '').localeCompare(a.addedAt ?? '')), watchlist.length, 'watchlist', window.innerWidth <= 700 ? 6 : 10, 2);
+  renderCustomLists();
   fillCommunityStrip();
   fillActivitySection();
   showMigrateSection();
@@ -1454,6 +1470,273 @@ function populateHomePage() {
     if (isOwnProfile) bindStatClicks();
   }
 }
+
+// ── Listes personnalisées ─────────────────────────────────────
+function resolveCustomListItems(list) {
+  const all = [...films, ...series, ...anime];
+  return Object.entries(list.items || {})
+    .map(([key, snapshot]) => {
+      const live = all.find(i => catalogKey(i.title) === key);
+      if (live) return live;
+      return (snapshot && typeof snapshot === 'object' && snapshot.title) ? snapshot : null;
+    })
+    .filter(Boolean);
+}
+
+function renderCustomLists() {
+  const container  = document.getElementById('home-custom-lists');
+  const newListBtn = document.getElementById('home-new-list-btn');
+  const label      = document.getElementById('home-custom-lists-label');
+  if (!container) return;
+  const isOwn = currentUser && currentViewUid === currentUser.uid;
+  if (newListBtn) newListBtn.classList.toggle('hidden', !isOwn);
+
+  container.innerHTML = '';
+  let visibleCount = 0;
+  customLists.forEach(list => {
+    const items = resolveCustomListItems(list);
+    if (!items.length && !isOwn) return;
+    visibleCount++;
+
+    const section = document.createElement('section');
+    section.className = 'home-carousel';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'home-carousel-hdr';
+    hdr.innerHTML = `
+      <div class="home-carousel-title-group">
+        <h2 class="home-carousel-title${isOwn ? ' home-carousel-title-editable' : ''}">${list.name}</h2>
+        <span class="home-strip-badge">${items.length}</span>
+      </div>
+    `;
+
+    if (isOwn) {
+      const titleEl = hdr.querySelector('.home-carousel-title');
+      titleEl.title = 'Renommer la liste';
+      titleEl.addEventListener('click', e => {
+        e.stopPropagation();
+        openListNameModal(list.id);
+      });
+      const delBtn = document.createElement('button');
+      delBtn.className = 'home-list-delete-btn';
+      delBtn.title = 'Supprimer la liste';
+      delBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+      delBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        openDeleteListModal(list, items.length);
+      });
+      hdr.appendChild(delBtn);
+    }
+    section.appendChild(hdr);
+
+    const stripId = `home-strip-custom-${list.id}`;
+    const stripDiv = document.createElement('div');
+    stripDiv.className = 'home-strip';
+    stripDiv.id = stripId;
+    stripDiv.addEventListener('click', () => navigateToApp('custom', list.id));
+    section.appendChild(stripDiv);
+
+    container.appendChild(section);
+
+    fillStrip(
+      stripId, items, items.length,
+      isOwn ? () => openListPicker(list.id) : false,
+      window.innerWidth <= 700 ? 6 : 10, 2
+    );
+  });
+
+  if (label) label.classList.toggle('hidden', !isOwn && visibleCount === 0);
+}
+
+let _listNameModalTargetId = null;
+
+let _deleteListTimer = null;
+
+function openDeleteListModal(list, count) {
+  const modal = document.getElementById('delete-list-modal');
+  document.getElementById('delete-list-message').textContent =
+    `Supprimer « ${list.name} » ? Les ${count} titre${count > 1 ? 's' : ''} qu'elle regroupe ne seront plus associés à cette liste (ils resteront dans tes films/séries visionnés).`;
+  const confirmBtn = document.getElementById('delete-list-confirm');
+  confirmBtn.onclick = async () => {
+    await db.ref(`users/${currentUser.uid}/customLists/${list.id}`).remove();
+    customLists = customLists.filter(l => l.id !== list.id);
+    closeDeleteListModal();
+    renderCustomLists();
+  };
+
+  clearInterval(_deleteListTimer);
+  let remaining = 5;
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = `Supprimer (${remaining})`;
+  _deleteListTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(_deleteListTimer);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Supprimer';
+    } else {
+      confirmBtn.textContent = `Supprimer (${remaining})`;
+    }
+  }, 1000);
+
+  modal.classList.remove('hidden', 'closing');
+}
+function closeDeleteListModal() {
+  clearInterval(_deleteListTimer);
+  const modal = document.getElementById('delete-list-modal');
+  modal.classList.add('closing');
+  modal.addEventListener('animationend', () => {
+    modal.classList.add('hidden');
+    modal.classList.remove('closing');
+  }, { once: true });
+}
+document.getElementById('delete-list-close').addEventListener('click', closeDeleteListModal);
+document.getElementById('delete-list-cancel').addEventListener('click', closeDeleteListModal);
+document.getElementById('delete-list-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeDeleteListModal();
+});
+
+function openListNameModal(listId = null) {
+  _listNameModalTargetId = listId;
+  const list  = listId ? customLists.find(l => l.id === listId) : null;
+  const input = document.getElementById('new-list-name');
+  document.getElementById('new-list-modal-title').textContent = list ? 'Renommer la liste' : 'Nouvelle liste';
+  document.getElementById('new-list-save').textContent        = list ? 'Renommer' : 'Créer';
+  input.value = list ? list.name : '';
+  document.getElementById('new-list-modal').classList.remove('hidden');
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+
+document.getElementById('home-new-list-btn').addEventListener('click', () => openListNameModal(null));
+document.getElementById('new-list-close').addEventListener('click', () => {
+  document.getElementById('new-list-modal').classList.add('hidden');
+});
+document.getElementById('new-list-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('new-list-modal')) {
+    document.getElementById('new-list-modal').classList.add('hidden');
+  }
+});
+
+async function saveListName() {
+  if (!currentUser) return;
+  const input = document.getElementById('new-list-name');
+  const name  = input.value.trim();
+  if (!name) return;
+
+  if (_listNameModalTargetId) {
+    const list = customLists.find(l => l.id === _listNameModalTargetId);
+    if (!list) return;
+    list.name = name;
+    await db.ref(`users/${currentUser.uid}/customLists/${list.id}/name`).set(name);
+  } else {
+    const ref       = db.ref(`users/${currentUser.uid}/customLists`).push();
+    const createdAt = new Date().toISOString();
+    await ref.set({ name, createdAt, items: {} });
+    customLists.push({ id: ref.key, name, createdAt, items: {} });
+  }
+
+  document.getElementById('new-list-modal').classList.add('hidden');
+  renderCustomLists();
+}
+document.getElementById('new-list-save').addEventListener('click', saveListName);
+document.getElementById('new-list-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); saveListName(); }
+});
+
+let _listPickerTargetId  = null;
+let _listPickerDebounce  = null;
+
+function openListPicker(listId) {
+  _listPickerTargetId = listId;
+  const list = customLists.find(l => l.id === listId);
+  document.getElementById('list-picker-title').textContent = list ? `Ajouter à "${list.name}"` : 'Ajouter des titres';
+  document.getElementById('list-picker-search').value = '';
+  document.getElementById('list-picker-grid').innerHTML = '';
+  document.getElementById('list-picker-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('list-picker-search').focus(), 50);
+}
+function closeListPicker() {
+  document.getElementById('list-picker-modal').classList.add('hidden');
+}
+
+async function searchListPickerTmdb(query) {
+  const grid = document.getElementById('list-picker-grid');
+  const q = query.trim();
+  if (q.length < 2) { grid.innerHTML = ''; return; }
+  grid.innerHTML = '<p class="tmdb-msg">Recherche…</p>';
+  try {
+    const json = await adminTmdbFetch(`/search/multi?query=${encodeURIComponent(q)}&include_adult=false`);
+    const results = (json.results || [])
+      .filter(r => r.media_type === 'movie' || r.media_type === 'tv')
+      .slice(0, 20);
+
+    if (!results.length) { grid.innerHTML = '<p class="tmdb-msg">Aucun résultat.</p>'; return; }
+
+    grid.innerHTML = '';
+    results.forEach(r => {
+      const isMovie   = r.media_type === 'movie';
+      const title     = isMovie ? r.title : r.name;
+      const year      = (isMovie ? r.release_date : r.first_air_date)?.slice(0, 4);
+      const poster    = r.poster_path ? TMDB_IMG + r.poster_path : null;
+      const inCatalog = [...films, ...series, ...anime].some(i => i.title === title);
+      const card = document.createElement('div');
+      card.className = 'tmdb-card' + (inCatalog ? ' tmdb-card-active' : '');
+      card.innerHTML = `
+        <img src="${poster || ''}" alt="" onerror="this.style.background='#222';this.src=''" />
+        <div class="tmdb-card-info">
+          <p class="tmdb-card-title">${title}</p>
+          <p class="tmdb-card-year">${year || ''}${inCatalog ? ' · <em>déjà dans ton catalogue</em>' : ''}</p>
+        </div>
+      `;
+      card.addEventListener('click', () => addTmdbResultToList(r.id, isMovie ? 'movie' : 'tv'));
+      grid.appendChild(card);
+    });
+  } catch (e) {
+    grid.innerHTML = '<p class="tmdb-msg">Erreur de recherche.</p>';
+  }
+}
+
+async function addTmdbResultToList(tmdbId, type) {
+  if (!currentUser || !_listPickerTargetId) return;
+  const list = customLists.find(l => l.id === _listPickerTargetId);
+  if (!list) return;
+
+  const item    = await fetchTmdbItem(tmdbId, type);
+  const key     = catalogKey(item.title);
+  const arrName = type === 'movie' ? 'films' : 'series';
+  const already = [...films, ...series, ...anime].some(i => catalogKey(i.title) === key);
+
+  if (!already) {
+    const personal = extractPersonalFields(item);
+    personal.addedAt = personal.addedAt || new Date().toISOString();
+    delete personal.stars;
+    await Promise.all([
+      db.ref(`users/${currentUser.uid}/${arrName}/${key}`).set(personal),
+      db.ref(`catalog/${arrName}/${key}`).update(extractSharedFields(item)),
+    ]);
+    if (arrName === 'films') films = [...films, { ...item, ...personal }];
+    else series = [...series, { ...item, ...personal }];
+  }
+
+  if (!list.items[key]) {
+    const snapshot = extractSharedFields(item);
+    list.items[key] = snapshot;
+    await db.ref(`users/${currentUser.uid}/customLists/${list.id}/items/${key}`).set(snapshot);
+  }
+
+  closeListPicker();
+  renderCustomLists();
+}
+
+document.getElementById('list-picker-close').addEventListener('click', closeListPicker);
+document.getElementById('list-picker-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('list-picker-modal')) closeListPicker();
+});
+document.getElementById('list-picker-search').addEventListener('input', e => {
+  clearTimeout(_listPickerDebounce);
+  const query = e.target.value;
+  _listPickerDebounce = setTimeout(() => searchListPickerTmdb(query), 350);
+});
 
 // ── Migration vers le catalogue partagé ──────────────────────
 const CATALOG_SHARED_FIELDS = [
@@ -1791,6 +2074,27 @@ function showMigrateSection() {
   if (section) section.classList.toggle('hidden', !isOwn);
 }
 
+// ── Toast annuler ──────────────────────────────────────────
+let _undoToastTimer = null;
+function showUndoToast(message, onUndo) {
+  const toast   = document.getElementById('undo-toast');
+  const textEl  = document.getElementById('undo-toast-text');
+  const undoBtn = document.getElementById('undo-toast-btn');
+  if (!toast) return;
+
+  clearTimeout(_undoToastTimer);
+  textEl.textContent = message;
+  toast.classList.add('visible');
+
+  const hide = () => toast.classList.remove('visible');
+  undoBtn.onclick = () => {
+    clearTimeout(_undoToastTimer);
+    hide();
+    onUndo();
+  };
+  _undoToastTimer = setTimeout(hide, 6000);
+}
+
 function fillActivitySection() {
   const container = document.getElementById('home-activity-list');
   const section   = document.getElementById('home-section-activity');
@@ -1826,6 +2130,9 @@ function fillActivitySection() {
       monthEl.className = 'activity-month-header';
       monthEl.textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1);
       container.appendChild(monthEl);
+      const monthDivider = document.createElement('hr');
+      monthDivider.className = 'home-divider';
+      container.appendChild(monthDivider);
       lastMonth = month;
     }
 
@@ -1835,18 +2142,13 @@ function fillActivitySection() {
     el.className = 'activity-item';
     const dateStr = new Date(item.addedAt).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
     const isOwn = currentUser && currentViewUid === currentUser.uid;
-    const starSvg = `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>`;
-    const starsHtml = item.stars ? `<div class="activity-stars">${Array.from({length:10}, (_,i) =>
-      `<span class="activity-star${i < item.stars ? ' filled' : ''}">${starSvg}</span>`
-    ).join('')}</div>` : '';
     el.innerHTML = `
       ${item.poster ? `<img class="activity-poster" src="${item.poster}" alt="" />` : `<div class="activity-poster activity-poster-empty"></div>`}
       <div class="activity-info">
         <p class="activity-watched">A visionné</p>
         <p class="activity-title">${item.title}</p>
-        ${starsHtml}
         <p class="activity-date">le ${dateStr}</p>
-        ${isOwn ? `<button class="activity-delete-btn" title="Retirer de l'activité">✕</button>` : ''}
+        ${isOwn ? `<button class="activity-delete-btn" title="Retirer de l'activité"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M480-160q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm0-240q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm0-240q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Z"/></svg></button>` : ''}
       </div>
     `;
     el.style.cursor = 'pointer';
@@ -1862,6 +2164,7 @@ function fillActivitySection() {
         confirmBtn.className = 'activity-confirm-btn';
         confirmBtn.textContent = 'Supprimer cette activité';
         el.querySelector('.activity-delete-btn').replaceWith(confirmBtn);
+        el.classList.add('confirming');
 
         confirmBtn.addEventListener('click', async e => {
           e.stopPropagation();
@@ -1871,9 +2174,18 @@ function fillActivitySection() {
           else                                               { arr = anime;  arrName = 'anime'; }
           const idx = arr.findIndex(i => i.title === item.title);
           if (idx !== -1) {
+            const previousAddedAt = arr[idx].addedAt;
             delete arr[idx].addedAt;
             await db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
             fillActivitySection();
+            showUndoToast(`"${item.title}" retiré de l'activité.`, async () => {
+              const idx2 = arr.findIndex(i => i.title === item.title);
+              if (idx2 !== -1) {
+                arr[idx2].addedAt = previousAddedAt;
+                await db.ref(`users/${currentUser.uid}/${arrName}`).set(arr);
+                fillActivitySection();
+              }
+            });
           }
         });
 
@@ -1965,7 +2277,7 @@ function fillCommunityStrip() {
   });
 }
 
-function fillStrip(stripId, items, total, showAddBtn = false, maxItems = 7, extraOverlap = 2.5) {
+function fillStrip(stripId, items, total, addTarget = false, maxItems = 7, extraOverlap = 2.5, onCardClick = null) {
   const strip = document.getElementById(stripId);
   if (!strip) return;
   strip.innerHTML = '';
@@ -1989,6 +2301,13 @@ function fillStrip(stripId, items, total, showAddBtn = false, maxItems = 7, extr
       ph.textContent = item.title;
       card.appendChild(ph);
     }
+    if (onCardClick) {
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', e => {
+        e.stopPropagation();
+        onCardClick(item, card);
+      });
+    }
     row.appendChild(card);
   });
 
@@ -2000,13 +2319,16 @@ function fillStrip(stripId, items, total, showAddBtn = false, maxItems = 7, extr
     row.appendChild(ghost);
   }
 
-  if (showAddBtn) {
+  if (addTarget) {
     const wrap = document.createElement('div');
     wrap.className = 'home-carousel-add-wrap';
     const addBtn = document.createElement('button');
     addBtn.className = 'home-carousel-add-btn';
     addBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
-    addBtn.addEventListener('click', quickAddToWatchlist);
+    addBtn.addEventListener('click', () => {
+      if (typeof addTarget === 'function') addTarget();
+      else quickAddToList(addTarget);
+    });
     wrap.appendChild(row);
     wrap.appendChild(addBtn);
     strip.appendChild(wrap);
@@ -2088,6 +2410,7 @@ auth.onAuthStateChanged(user => {
 // ============================================================
 
 let currentTab = "films";
+let currentCustomListId = null;
 let currentGenre = "Tous";
 let currentSort = localStorage.getItem("sort") ?? "alpha-asc";
 let currentStarFilter = 'all';
@@ -2275,7 +2598,7 @@ function sortData(data) {
 
 function render() {
   const query = searchInput.value.trim().toLowerCase();
-  const raw = currentTab === "films" ? films : currentTab === "watchlist" ? watchlist : [...series, ...anime];
+  const raw = getTabData(currentTab);
 
   let data = sortData(raw);
 
@@ -2307,10 +2630,10 @@ function render() {
     setCount('time-count', `${wSeries} série${wSeries > 1 ? 's' : ''}`);
     setCount('sm-time-count', `${wSeries} série${wSeries > 1 ? 's' : ''}`);
   } else {
-    const label = currentTab === "films" ? "film" : currentTab === "series" ? "série" : "animé";
+    const label = currentTab === "films" ? "film" : currentTab === "series" ? "série" : currentTab === "custom" ? "titre" : "animé";
     setCount('result-count', `${data.length} ${label}${data.length > 1 ? "s" : ""}`);
     setCount('sm-result-count', `${data.length} ${label}${data.length > 1 ? "s" : ""}`);
-    if (currentTab !== 'films') {
+    if (currentTab !== 'films' && currentTab !== 'custom') {
       setCount('time-count', '', false);
       setCount('sm-time-count', '', false);
     } else {
@@ -2321,7 +2644,7 @@ function render() {
     }
   }
   const topSection = document.getElementById('top-section');
-  if (topSection) topSection.style.display = (query || currentTab === 'watchlist') ? 'none' : '';
+  if (topSection) topSection.style.display = (query || currentTab === 'watchlist' || currentTab === 'custom') ? 'none' : '';
 
   grid.innerHTML = "";
 
@@ -2762,12 +3085,14 @@ homeSearchInput.addEventListener('focus', () => {
     }, 220);
   }
 });
+homeSearchClear.addEventListener('mousedown', e => {
+  // Empêche le bouton de voler le focus à l'input (et donc de le "désélectionner").
+  e.preventDefault();
+});
 homeSearchClear.addEventListener('click', () => {
   homeSearchInput.value = '';
   updateHomeSearchClear();
-  homeSuggestionList.style.display = 'none';
-  homeSearchInput.blur();
-  document.querySelector('.home-header')?.classList.remove('search-focused');
+  showHomeSuggestions('');
 });
 
 // ── TMDB item modal / person filmography ─────────────────────
@@ -3087,22 +3412,16 @@ function openModal(item, triggerEl) {
     });
   }
 
-  const transferActions = document.getElementById('modal-transfer-actions');
   const isOwnWatchlist = !isGuest && isWatchlistItem;
-  transferActions.classList.toggle('hidden', !isOwnWatchlist);
-  if (isOwnWatchlist) {
-    const isFilm   = !!(item.time);
-    const isSeries = !isFilm;
-    const filmsBtn  = document.getElementById('modal-transfer-films');
-    const seriesBtn = document.getElementById('modal-transfer-series');
-    filmsBtn.style.display  = isSeries ? 'none' : '';
-    seriesBtn.style.display = isFilm   ? 'none' : '';
-    filmsBtn.onclick  = () => transferFromWatchlist(item, 'films');
-    seriesBtn.onclick = () => transferFromWatchlist(item, 'series');
+
+  const addToListBtn = document.getElementById('modal-add-to-list-btn');
+  if (addToListBtn) {
+    addToListBtn.classList.toggle('hidden', !isOwn);
+    if (isOwn) addToListBtn.onclick = () => openAddToListModal(item);
   }
 
   // Titre absent de mes listes (résultat TMDB, ou présent seulement dans la watchlist) —
-  // ignoré si on est déjà dans le cas "Marquer comme vu" ci-dessus (onglet Watchlist)
+  // ignoré si on est sur l'onglet Watchlist (isOwnWatchlist), où "Ajouter à une liste" suffit déjà.
   const addWatchlistBtn = document.getElementById('modal-add-watchlist-btn');
   const addFilmsBtn     = document.getElementById('modal-add-films-btn');
   const addSeriesBtn    = document.getElementById('modal-add-series-btn');
@@ -3243,6 +3562,129 @@ async function addItemToMyPersonalList(item, arrName, btn) {
   refreshViews();
 }
 
+// ── Ajouter à une liste (Films/Séries + listes perso) ─────────
+let _addToListItem = null;
+
+function openAddToListModal(item) {
+  if (!currentUser) return;
+  _addToListItem = item;
+  _addToListAnimateId = null;
+  renderAddToListOptions();
+  document.getElementById('add-to-list-modal').classList.remove('hidden', 'closing');
+}
+function closeAddToListModal() {
+  const modal = document.getElementById('add-to-list-modal');
+  modal.classList.add('closing');
+  modal.addEventListener('animationend', () => {
+    modal.classList.add('hidden');
+    modal.classList.remove('closing');
+  }, { once: true });
+}
+document.getElementById('add-to-list-close').addEventListener('click', closeAddToListModal);
+document.getElementById('add-to-list-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('add-to-list-modal')) closeAddToListModal();
+});
+
+let _addToListAnimateId = null;
+
+function buildAddToListRow(rowId, label, checked, disabled, onToggle, type = '') {
+  const row = document.createElement('button');
+  row.className = 'add-to-list-row'
+    + (type ? ` ${type}` : '')
+    + (checked ? ' checked' : '')
+    + (disabled ? ' disabled' : '')
+    + (_addToListAnimateId === rowId ? ' pop' : '');
+  row.innerHTML = `
+    <span class="add-to-list-check">${checked ? '✓' : ''}</span>
+    <span class="add-to-list-label">${label}</span>
+  `;
+  if (!disabled) {
+    row.addEventListener('click', () => {
+      _addToListAnimateId = rowId;
+      onToggle();
+    });
+  }
+  return row;
+}
+
+async function toggleSeenStatus(item, arrName, isInSeenList) {
+  if (!currentUser) return;
+  const key = catalogKey(item.title);
+  if (isInSeenList) {
+    await db.ref(`users/${currentUser.uid}/${arrName}/${key}`).remove();
+    if (arrName === 'films') films  = films.filter(i => i.title !== item.title);
+    else                      series = series.filter(i => i.title !== item.title);
+  } else {
+    const personal = extractPersonalFields(item);
+    personal.addedAt = personal.addedAt || new Date().toISOString();
+    delete personal.stars;
+    await Promise.all([
+      db.ref(`users/${currentUser.uid}/${arrName}/${key}`).set(personal),
+      db.ref(`catalog/${arrName}/${key}`).update(extractSharedFields(item)),
+    ]);
+    if (arrName === 'films') films  = [...films, { ...item, ...personal }];
+    else                      series = [...series, { ...item, ...personal }];
+  }
+  refreshViews();
+}
+
+async function renderAddToListOptions() {
+  const item      = _addToListItem;
+  const container = document.getElementById('add-to-list-options');
+  container.innerHTML = '';
+  if (!item) return;
+
+  const isSeriesItem  = !!(item.seasons || item.episodes);
+  const arrName       = isSeriesItem ? 'series' : 'films';
+  const builtinLabel  = isSeriesItem ? 'Séries visionnées' : 'Films visionnés';
+  const isInSeenList  = [...films, ...series, ...anime].some(i => i.title === item.title);
+  const isInWatchlist = watchlist.some(i => i.title === item.title);
+
+  container.appendChild(buildAddToListRow('watchlist', 'Ma Watchlist', isInWatchlist, false, async () => {
+    if (isInWatchlist) {
+      const key = catalogKey(item.title);
+      await db.ref(`users/${currentUser.uid}/watchlist/${key}`).remove();
+      watchlist = watchlist.filter(i => i.title !== item.title);
+      refreshViews();
+    } else {
+      await addToMyWatchlist(item, document.createElement('button'));
+    }
+    renderAddToListOptions();
+  }, 'watchlist'));
+
+  container.appendChild(buildAddToListRow('seen', builtinLabel, isInSeenList, false, async () => {
+    await toggleSeenStatus(item, arrName, isInSeenList);
+    renderAddToListOptions();
+  }, 'seen'));
+
+  if (!customLists.length) {
+    const empty = document.createElement('p');
+    empty.className = 'add-to-list-empty';
+    empty.textContent = 'Aucune liste personnalisée pour le moment.';
+    container.appendChild(empty);
+    _addToListAnimateId = null;
+    return;
+  }
+
+  const key = catalogKey(item.title);
+  customLists.forEach(list => {
+    const inList = !!list.items[key];
+    container.appendChild(buildAddToListRow(list.id, list.name, inList, false, async () => {
+      if (inList) {
+        delete list.items[key];
+        await db.ref(`users/${currentUser.uid}/customLists/${list.id}/items/${key}`).remove();
+      } else {
+        const snapshot = extractSharedFields(item);
+        list.items[key] = snapshot;
+        await db.ref(`users/${currentUser.uid}/customLists/${list.id}/items/${key}`).set(snapshot);
+      }
+      renderAddToListOptions();
+      renderCustomLists();
+    }));
+  });
+  _addToListAnimateId = null;
+}
+
 async function copyItemToMyList(item, btn) {
   if (!currentUser) return;
   let arrName = 'films';
@@ -3267,32 +3709,6 @@ async function copyItemToMyList(item, btn) {
   btn.onclick = null;
 }
 
-async function transferFromWatchlist(item, targetList) {
-  if (!currentUser) return;
-  const filmsBtn  = document.getElementById('modal-transfer-films');
-  const seriesBtn = document.getElementById('modal-transfer-series');
-  filmsBtn.disabled = true;
-  seriesBtn.disabled = true;
-
-  const key = catalogKey(item.title);
-  const personal = extractPersonalFields(item);
-  delete personal.stars;
-  personal.addedAt = new Date().toISOString();
-
-  await Promise.all([
-    db.ref(`users/${currentUser.uid}/${targetList}/${key}`).set(personal),
-    db.ref(`users/${currentUser.uid}/watchlist/${key}`).remove(),
-    db.ref(`catalog/${targetList}/${key}`).update(extractSharedFields(item)),
-  ]);
-
-  watchlist = watchlist.filter(i => i.title !== item.title);
-  if (targetList === 'films') films = [...films, { ...item }];
-  else series = [...series, { ...item }];
-
-  closeModal();
-  render();
-}
-
 modalClose.addEventListener('click', closeModal);
 modalBackdrop.addEventListener('click', e => {
   if (e.target !== modalBackdrop) return;
@@ -3311,7 +3727,7 @@ let   topPopupOpen  = null;
 
 function computeTop(key, limit = 10) {
   const counts = {};
-  const source = currentTab === 'films' ? films : [...series, ...anime];
+  const source = getTabData(currentTab);
   for (const item of source) {
     if (key === 'director') {
       if (item.director) counts[item.director] = (counts[item.director] || 0) + 1;
@@ -3435,7 +3851,7 @@ function updateStatsSidebar() {
     });
   }
 
-  const source   = currentTab === 'films' ? films : [...series, ...anime];
+  const source   = getTabData(currentTab);
   const rated    = source.filter(i => i.stars >= 0 && i.stars <= 10);
   const total    = rated.length;
   const counts   = Array(11).fill(0);
@@ -3531,6 +3947,16 @@ function renderSideTabs() {
     btn.textContent = label;
     btn.addEventListener('click', () => {
       navigateToApp(key);
+      closeSideMenu();
+    });
+    container.appendChild(btn);
+  });
+  customLists.forEach(list => {
+    const btn = document.createElement('button');
+    btn.className = 'side-tab-btn' + (currentTab === 'custom' && currentCustomListId === list.id ? ' active' : '');
+    btn.textContent = list.name;
+    btn.addEventListener('click', () => {
+      navigateToApp('custom', list.id);
       closeSideMenu();
     });
     container.appendChild(btn);
@@ -3939,7 +4365,7 @@ function closeAdminPanel() {
 
 document.getElementById('admin-back-btn').addEventListener('click', closeAdminPanel);
 
-async function quickAddToWatchlist() {
+async function quickAddToList(tab) {
   if (!currentUser) return;
   _quickAddMode = true;
   if (!adminDataLoaded) {
@@ -3953,7 +4379,7 @@ async function quickAddToWatchlist() {
     };
     adminDataLoaded = true;
   }
-  adminTab = 'watchlist';
+  adminTab = tab;
   openAdminModal(null);
 }
 
@@ -4119,7 +4545,7 @@ function openAdminModal(idx = null) {
   document.getElementById('film-fields').classList.toggle('hidden', !isFilm);
   document.getElementById('series-fields').classList.toggle('hidden', isFilm);
   document.getElementById('tmdb-section').classList.toggle('hidden', idx !== null);
-  document.getElementById('modal-title-label').textContent = idx === null ? 'Ajouter' : 'Éditer';
+  document.getElementById('modal-title-label').textContent = idx === null ? 'Ajout rapide' : 'Éditer';
   document.getElementById('form-submit').textContent       = idx === null ? 'Ajouter' : 'Mettre à jour';
 
   const fieldsWrap = document.getElementById('form-fields-wrap');
