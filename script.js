@@ -460,24 +460,6 @@ document.getElementById('user-menu-following-btn').addEventListener('click', () 
 });
 
 // ── Avatar ───────────────────────────────────────────────────
-function setHomeHeaderBg(url) {
-  const bg = document.getElementById('home-header-bg');
-  if (url) {
-    bg.style.transition = 'none';
-    bg.style.opacity = '0';
-    bg.src = url;
-    bg.style.display = 'block';
-    requestAnimationFrame(() => {
-      bg.style.transition = 'opacity 0.7s ease';
-      bg.style.opacity = '1';
-    });
-  } else {
-    bg.style.display = 'none';
-    bg.style.opacity = '';
-    bg.style.transition = '';
-  }
-}
-
 function setAvatarDisplay(url) {
   const btnAvatar = document.getElementById('user-btn-avatar');
   const initials  = document.getElementById('user-initials');
@@ -491,8 +473,6 @@ function setAvatarDisplay(url) {
   homeAvatar.style.display = 'block';
   homeInitials.style.display = 'none';
 
-  setHomeHeaderBg(url);
-
   const menuImg     = document.getElementById('user-menu-avatar-img');
   const menuInitial = document.getElementById('user-menu-avatar-initial');
   menuImg.src             = url;
@@ -505,7 +485,6 @@ function clearAvatarDisplay() {
   document.getElementById('user-initials').style.display      = '';
   document.getElementById('home-user-avatar').style.display   = 'none';
   document.getElementById('home-user-initials').style.display = '';
-  setHomeHeaderBg(null);
   document.getElementById('user-menu-avatar-img').style.display     = 'none';
   document.getElementById('user-menu-avatar-initial').style.display = '';
 }
@@ -1397,6 +1376,7 @@ function switchTab(tab, customListId = null) {
   currentGenre = 'Tous';
   currentStarFilter = 'all';
   searchInput.value = '';
+  loadDisplayPrefsForCurrentList();
   buildGenreFilters(getTabData(currentTab));
   renderRecommendation();
   render();
@@ -1428,7 +1408,7 @@ function populateHomePage() {
   fillStrip('home-strip-watchlist', [...watchlist].sort((a, b) => (b.addedAt ?? '').localeCompare(a.addedAt ?? '')), watchlist.length, 'watchlist', window.innerWidth <= 700 ? 6 : 10, 2);
   renderCustomLists();
   fillCommunityStrip();
-  fillActivitySection();
+  scheduleActivitySection();
   showMigrateSection();
 
   const setBadge = (id, count) => { const el = document.getElementById(id); if (el) el.textContent = count; };
@@ -2095,6 +2075,31 @@ function showUndoToast(message, onUndo) {
   _undoToastTimer = setTimeout(hide, 6000);
 }
 
+let _activityObserver = null;
+
+function scheduleActivitySection() {
+  const section = document.getElementById('home-section-activity');
+  if (!section) return;
+
+  const rect = section.getBoundingClientRect();
+  const alreadyNear = rect.top < window.innerHeight + 200 && rect.bottom > -200;
+  if (alreadyNear) {
+    fillActivitySection();
+    return;
+  }
+
+  if (_activityObserver) _activityObserver.disconnect();
+  _activityObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        fillActivitySection();
+        observer.disconnect();
+      }
+    });
+  }, { rootMargin: '200px' });
+  _activityObserver.observe(section);
+}
+
 function fillActivitySection() {
   const container = document.getElementById('home-activity-list');
   const section   = document.getElementById('home-section-activity');
@@ -2416,36 +2421,52 @@ let currentSort = localStorage.getItem("sort") ?? "alpha-asc";
 let currentStarFilter = 'all';
 
 // ── Préférences d'affichage ───────────────────────────────────
-const displayPrefs = { showTitles: false, showDates: false, showRatings: false };
+const displayPrefs = { showTitles: false, showDates: false, showRatings: true, compact: true };
+let allDisplayPrefs = {};
+
+function getCurrentListKey() {
+  return currentTab === 'custom' ? `custom_${currentCustomListId}` : currentTab;
+}
 
 function applyDisplayPrefs() {
   grid.classList.toggle('show-titles',  displayPrefs.showTitles);
   grid.classList.toggle('show-dates',   displayPrefs.showDates);
   grid.classList.toggle('show-ratings', displayPrefs.showRatings);
+  grid.classList.toggle('compact',      displayPrefs.compact);
+  compactSideBtn.classList.toggle('active', displayPrefs.compact);
   ['pref-titles', 'sm-pref-titles'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = displayPrefs.showTitles; });
   ['pref-dates',  'sm-pref-dates' ].forEach(id => { const el = document.getElementById(id); if (el) el.checked = displayPrefs.showDates; });
   ['pref-ratings','sm-pref-ratings'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = displayPrefs.showRatings; });
-  ['pref-compact','sm-pref-compact'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = grid.classList.contains('compact'); });
+  ['pref-compact','sm-pref-compact'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = displayPrefs.compact; });
 }
 
 async function saveDisplayPrefs() {
   if (!currentUser) return;
-  await db.ref(`users/${currentUser.uid}/displayPrefs`).set(displayPrefs);
+  const key = getCurrentListKey();
+  allDisplayPrefs[key] = { ...displayPrefs };
+  await db.ref(`users/${currentUser.uid}/displayPrefs/${key}`).set(displayPrefs);
 }
 
-async function loadDisplayPrefs(uid) {
-  const snap = await db.ref(`users/${uid}/displayPrefs`).once('value');
-  const saved = snap.val();
+function loadDisplayPrefsForCurrentList() {
+  const saved = allDisplayPrefs[getCurrentListKey()];
   if (saved) {
     displayPrefs.showTitles  = saved.showTitles  ?? false;
     displayPrefs.showDates   = saved.showDates   ?? false;
-    displayPrefs.showRatings = saved.showRatings ?? false;
+    displayPrefs.showRatings = saved.showRatings ?? true;
+    displayPrefs.compact     = saved.compact     ?? true;
   } else {
     displayPrefs.showTitles  = false;
     displayPrefs.showDates   = false;
     displayPrefs.showRatings = true;
+    displayPrefs.compact     = true;
   }
   applyDisplayPrefs();
+}
+
+async function loadDisplayPrefs(uid) {
+  const snap = await db.ref(`users/${uid}/displayPrefs`).once('value');
+  allDisplayPrefs = snap.val() || {};
+  loadDisplayPrefsForCurrentList();
 }
 
 const prefKeyMap = { 'pref-titles': 'showTitles', 'pref-dates': 'showDates', 'pref-ratings': 'showRatings',
@@ -2470,18 +2491,12 @@ const genreDropdown = document.getElementById("genre-dropdown");
 const compactSideBtn = document.getElementById("compact-side-btn");
 
 function setCompactLayout(compact) {
-  grid.classList.toggle("compact", compact);
-  compactSideBtn.classList.toggle("active", compact);
-  const cb = document.getElementById("pref-compact");
-  if (cb) cb.checked = compact;
-  localStorage.setItem("compactLayout", compact ? "1" : "0");
+  displayPrefs.compact = compact;
+  applyDisplayPrefs();
+  saveDisplayPrefs();
 }
 
-const savedCompact = localStorage.getItem("compactLayout");
-setCompactLayout(savedCompact === null ? true : savedCompact === "1");
-
-compactSideBtn.addEventListener("click", () => { setCompactLayout(!grid.classList.contains("compact")); closeSideMenu(); });
-document.getElementById("pref-compact").addEventListener("change", e => setCompactLayout(e.target.checked));
+compactSideBtn.addEventListener("click", () => { setCompactLayout(!displayPrefs.compact); closeSideMenu(); });
 
 const fBarToggle = document.getElementById("f-bar-toggle");
 const fBarControls = document.getElementById("f-bar-controls");
@@ -2760,8 +2775,12 @@ function updateLoadMoreBtn(total, shown) {
   }
   const remaining = total - shown;
   wrap.style.display = '';
-  wrap.innerHTML = `<button class="load-more-btn" id="load-more-btn">Voir plus <span class="load-more-count">${remaining} de plus</span></button>`;
+  wrap.innerHTML = `
+    <button class="load-more-btn" id="load-more-btn">Voir plus <span class="load-more-count">${remaining} de plus</span></button>
+    <button class="load-more-btn" id="load-all-btn">Tout afficher</button>
+  `;
   document.getElementById('load-more-btn').addEventListener('click', loadMoreItems);
+  document.getElementById('load-all-btn').addEventListener('click', loadAllItems);
 }
 
 function loadMoreItems() {
@@ -2772,6 +2791,15 @@ function loadMoreItems() {
     grid.appendChild(createCardWrapper(item, i));
   });
   updateLoadMoreBtn(currentRenderData.length, end);
+}
+
+function loadAllItems() {
+  const shownCount = grid.querySelectorAll('.card-wrapper').length;
+  currentRenderData.slice(shownCount).forEach((item, i) => {
+    grid.appendChild(createCardWrapper(item, shownCount + i));
+  });
+  gridPage = Math.ceil(currentRenderData.length / (GRID_ROWS_PER_PAGE * gridColCount)) || 1;
+  updateLoadMoreBtn(currentRenderData.length, currentRenderData.length);
 }
 
 tabs.forEach(tab => {
@@ -2945,6 +2973,12 @@ const HOME_SEARCH_TITLES = [
   'La vie trouve toujours un chemin',
   'Nous ne sommes pas seuls',
   'Un pour tous, tous pour un',
+  'Tu as déjà vu un monsieur tout nu ?',
+  'Dites bonjour à mon petit copain',
+  'Quel est ton film d\'horreur préféré ?',
+  'Nom de Zeus !',
+  'Force et honneur',
+  'T\'endors pas, c\'est l\'heure de mourir',
 ];
 const homeSearchTitleEl = document.getElementById('home-search-title');
 if (homeSearchTitleEl) {
@@ -3066,8 +3100,13 @@ homeSearchInput.addEventListener('blur', () => {
   document.querySelector('.home-content')?.classList.remove('search-active');
 });
 homeSearchInput.addEventListener('focus', () => {
-  document.querySelector('.home-header')?.classList.add('search-focused');
-  document.querySelector('.home-content')?.classList.add('search-active');
+  // Différé d'une frame : sur mobile, déclencher tout de suite le rétrécissement
+  // du header (reflow) pendant le focus peut empêcher le clavier de s'afficher
+  // au premier tap (iOS Safari notamment).
+  requestAnimationFrame(() => {
+    document.querySelector('.home-header')?.classList.add('search-focused');
+    document.querySelector('.home-content')?.classList.add('search-active');
+  });
   const query = homeSearchInput.value.trim();
   // Attendre la fin de l'animation de rétrécissement du header avant de
   // positionner le dropdown, sinon il se cale sur la position pré-animation.
@@ -3412,37 +3451,10 @@ function openModal(item, triggerEl) {
     });
   }
 
-  const isOwnWatchlist = !isGuest && isWatchlistItem;
-
   const addToListBtn = document.getElementById('modal-add-to-list-btn');
   if (addToListBtn) {
     addToListBtn.classList.toggle('hidden', !isOwn);
     if (isOwn) addToListBtn.onclick = () => openAddToListModal(item);
-  }
-
-  // Titre absent de mes listes (résultat TMDB, ou présent seulement dans la watchlist) —
-  // ignoré si on est sur l'onglet Watchlist (isOwnWatchlist), où "Ajouter à une liste" suffit déjà.
-  const addWatchlistBtn = document.getElementById('modal-add-watchlist-btn');
-  const addFilmsBtn     = document.getElementById('modal-add-films-btn');
-  const addSeriesBtn    = document.getElementById('modal-add-series-btn');
-  const isSeriesItem    = !!(item.seasons || item.episodes);
-  const isInWatchlist   = watchlist.some(i => i.title === item.title);
-  const showAddButtons  = isOwn && !isInSeenList && !isOwnWatchlist;
-
-  addWatchlistBtn.classList.toggle('hidden', !(showAddButtons && !isInWatchlist));
-  if (showAddButtons && !isInWatchlist) {
-    addWatchlistBtn.textContent = 'Ajouter à ma Watchlist';
-    addWatchlistBtn.classList.remove('copied');
-    addWatchlistBtn.onclick = () => addToMyWatchlist(item, addWatchlistBtn);
-  }
-
-  addFilmsBtn.classList.toggle('hidden', !(showAddButtons && !isSeriesItem));
-  addSeriesBtn.classList.toggle('hidden', !(showAddButtons && isSeriesItem));
-  if (showAddButtons) {
-    const addBtn = isSeriesItem ? addSeriesBtn : addFilmsBtn;
-    addBtn.classList.remove('copied');
-    addBtn.textContent = isSeriesItem ? 'Ajouter à ma liste de séries' : 'Ajouter à ma liste de films';
-    addBtn.onclick = () => addItemToMyPersonalList(item, isSeriesItem ? 'series' : 'films', addBtn);
   }
 
   const posterImg    = document.getElementById('modal-poster-img');
@@ -3534,32 +3546,6 @@ async function addToMyWatchlist(item, btn) {
   btn.textContent = '✓ Ajouté !';
   btn.classList.add('copied');
   btn.onclick = null;
-}
-
-async function addItemToMyPersonalList(item, arrName, btn) {
-  if (!currentUser) return;
-  const key  = catalogKey(item.title);
-  const snap = await db.ref(`users/${currentUser.uid}/${arrName}/${key}`).once('value');
-  if (snap.exists()) {
-    btn.textContent = 'Déjà dans ta liste';
-    btn.classList.add('copied');
-    return;
-  }
-  const personal = extractPersonalFields(item);
-  personal.addedAt = personal.addedAt || new Date().toISOString();
-  delete personal.stars;
-  await Promise.all([
-    db.ref(`users/${currentUser.uid}/${arrName}/${key}`).set(personal),
-    db.ref(`catalog/${arrName}/${key}`).update(extractSharedFields(item)),
-    db.ref(`users/${currentUser.uid}/watchlist/${key}`).remove(),
-  ]);
-  watchlist = watchlist.filter(i => i.title !== item.title);
-  if (arrName === 'films') films = [...films, { ...item, ...personal }];
-  else series = [...series, { ...item, ...personal }];
-  btn.textContent = '✓ Ajouté !';
-  btn.classList.add('copied');
-  btn.onclick = null;
-  refreshViews();
 }
 
 // ── Ajouter à une liste (Films/Séries + listes perso) ─────────

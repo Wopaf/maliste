@@ -451,9 +451,6 @@
         <div class="modal-bottom-actions">
           <button class="modal-copy-btn hidden" id="modal-copy-btn">Copier dans ma liste</button>
           <button class="modal-copy-btn hidden" id="modal-watchlist-btn">+ Ma Watchlist</button>
-          <button class="modal-copy-btn hidden" id="modal-add-watchlist-btn">Ajouter à ma Watchlist</button>
-          <button class="modal-copy-btn hidden" id="modal-add-films-btn">Ajouter à ma liste de films</button>
-          <button class="modal-copy-btn hidden" id="modal-add-series-btn">Ajouter à ma liste de séries</button>
         </div>
       </div>
     </div>
@@ -495,6 +492,13 @@
             Import / Export
           </button>
         </div>
+        <section class="sidebar-section sidebar-display-prefs">
+          <h3 class="sidebar-title">Affichage</h3>
+          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-titles" /> Titres</label>
+          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-dates" /> Dates</label>
+          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-ratings" /> Notes</label>
+          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-compact" /> Vue compacte</label>
+        </section>
         <section class="sidebar-section">
           <h3 class="sidebar-title">Trier</h3>
           <div id="side-sort-list"></div>
@@ -506,13 +510,6 @@
         <section class="sidebar-section" id="sm-sidebar-person-section" style="display:none">
           <h3 class="sidebar-title">Personnes</h3>
           <div id="sm-sidebar-person-badges"></div>
-        </section>
-        <section class="sidebar-section sidebar-display-prefs">
-          <h3 class="sidebar-title">Affichage</h3>
-          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-titles" /> Titres</label>
-          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-dates" /> Dates</label>
-          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-ratings" /> Notes</label>
-          <label class="sidebar-pref-item"><input type="checkbox" id="sm-pref-compact" /> Vue compacte</label>
         </section>
         <section class="sidebar-section" id="sm-sidebar-section-directors">
           <h3 class="sidebar-title">Top Réalisateurs</h3>
