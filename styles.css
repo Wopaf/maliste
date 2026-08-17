@@ -1145,8 +1145,8 @@ header {
 
 /* ── Stats Sidebar ── */
 @keyframes sidebarFadeIn {
-  from { opacity: 0; transform: translateX(50px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .stats-sidebar.sidebar-fade-in {
   animation: sidebarFadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
@@ -3327,16 +3327,16 @@ header {
   animation: homeLaunchIn 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 @keyframes slideInApp {
-  from { opacity: 0; transform: translateX(120px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @keyframes slideInAppLeft {
-  from { opacity: 0; transform: translateX(-120px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @keyframes slideOutApp {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(120px); }
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 #main-app.hidden { display: none; }
 #main-app { min-height: 100vh; opacity: 1; }
@@ -6201,6 +6201,9 @@ header {
   #time-count { display: none; }
 
   .home-search-title { font-size: 21px; padding: 0 12px; }
+  .home-carousel-card { height: calc(clamp(64px, 16vw, 84px) * 1.4); }
+  .home-carousel-add-btn { height: calc(clamp(64px, 16vw, 90px) * 1.4); }
+  .home-new-list-btn-label { display: none; }
   .undo-toast {
     left: 12px;
     right: 12px;

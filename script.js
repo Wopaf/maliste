@@ -2359,9 +2359,7 @@ function attachCarouselOverlap(row, extraOverlap = 2.5) {
 }
 
 // ── État d'authentification ───────────────────────────────────
-auth.onAuthStateChanged(user => {
-  _authResolved = true;
-  if (_loaderMinDone) _fadeOutLoader();
+auth.onAuthStateChanged(async user => {
   authSubmit.disabled = false;
   if (user) {
     currentUser    = user;
@@ -2381,7 +2379,10 @@ auth.onAuthStateChanged(user => {
       if (d.avatar) setAvatarDisplay(d.avatar);
       if (d.accentColor) applyAccentColor(d.accentColor);
     });
-    loadUserData(user.uid);
+    // On attend que les données (films/séries/watchlist/listes perso) soient chargées
+    // avant d'afficher la home et de retirer l'écran de chargement, pour éviter un
+    // flash de page d'accueil vide.
+    await loadUserData(user.uid);
     updateViewingBanner();
     showHomePage();
     startFollowRequestsListener();
@@ -2389,6 +2390,8 @@ auth.onAuthStateChanged(user => {
       history.replaceState(null, '', window.location.pathname);
       setTimeout(() => openAdminPanel(), 0);
     }
+    _authResolved = true;
+    if (_loaderMinDone) _fadeOutLoader();
   } else {
     currentUser    = null;
     currentViewUid = null;
@@ -2399,6 +2402,8 @@ auth.onAuthStateChanged(user => {
     homePage.classList.add('hidden');
     mainApp.classList.add('hidden');
     authSubmit.disabled = false;
+    _authResolved = true;
+    if (_loaderMinDone) _fadeOutLoader();
   }
 });
 
@@ -2944,14 +2949,18 @@ function updatePersonBadge(query) {
   });
 }
 
+let _mainSearchDebounce = null;
 searchInput.addEventListener("input", () => {
   updateSearchClear();
-  showSuggestions(searchInput.value.trim());
-  const q = searchInput.value.trim();
-  const recSection = document.querySelector('.rec-section');
-  if (recSection) recSection.style.display = q ? 'none' : '';
-  updatePersonBadge(q);
-  render();
+  clearTimeout(_mainSearchDebounce);
+  _mainSearchDebounce = setTimeout(() => {
+    const q = searchInput.value.trim();
+    showSuggestions(q);
+    const recSection = document.querySelector('.rec-section');
+    if (recSection) recSection.style.display = q ? 'none' : '';
+    updatePersonBadge(q);
+    render();
+  }, 200);
 });
 
 searchInput.addEventListener("blur", () => {
