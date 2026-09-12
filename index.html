@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mes Films & Séries</title>
+  <title>wow</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0d0d0d" />
+  <link rel="icon" href="medias/icon-192.png" />
+  <link rel="apple-touch-icon" href="medias/icon-180.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -18,7 +22,6 @@
 
   <!-- ── Écran de connexion ── -->
   <div id="auth-screen" class="auth-screen">
-    <img src="medias/logo1.png" class="auth-logo" alt="Logo" />
     <div class="auth-box">
       <p class="auth-mode-label" id="auth-mode-label">Connexion</p>
       <input type="email" id="auth-email" placeholder="Email" class="auth-input" autocomplete="email" />
@@ -40,7 +43,7 @@
       <div class="home-cover">
         <img class="home-header-bg" id="home-header-bg" src="" alt="" style="display:none" />
         <div class="home-cover-gradient"></div>
-        <img class="home-logo" src="medias/logo1.png" alt="Logo" />
+        <img class="home-logo" src="medias/Icon.png" alt="Logo" />
         <nav class="home-nav">
           <div class="follow-requests-wrap hidden" id="follow-requests-wrap">
             <button class="follow-requests-badge" id="follow-requests-badge" title="Demandes de suivi">
@@ -1007,6 +1010,13 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="script.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
 
   <!-- Bottom sheet mobile (publications) -->
   <button id="pub-sheet-btn" class="pub-sheet-btn" style="display:none" aria-label="Utilisateurs & Tendances">

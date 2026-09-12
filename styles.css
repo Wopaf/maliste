@@ -2419,14 +2419,6 @@ header {
   gap: 12px;
 }
 
-.auth-logo {
-  width: 110px;
-  height: 110px;
-  object-fit: contain;
-  align-self: center;
-  margin-bottom: 4px;
-}
-
 .auth-app-name {
   font-size: 12px;
   font-weight: 600;
