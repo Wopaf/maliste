@@ -418,7 +418,6 @@ function firebaseAuthError(code) {
 
 // ── Menu utilisateur ─────────────────────────────────────────
 const userBtn      = document.getElementById('user-btn');
-const homeUserBtn  = document.getElementById('home-user-btn');
 const userMenu     = document.getElementById('user-menu');
 const backHomeBtn  = document.getElementById('back-home-btn');
 
@@ -442,10 +441,15 @@ function toggleUserMenu(anchor, e) {
 }
 
 userBtn.addEventListener    ('click', e => toggleUserMenu(userBtn,     e));
-homeUserBtn.addEventListener('click', e => {
-  if (currentViewUid !== currentUser?.uid) return;
-  toggleUserMenu(homeUserBtn, e);
-});
+
+const homeCoverEl = document.querySelector('.home-cover');
+if (homeCoverEl) {
+  homeCoverEl.addEventListener('click', e => {
+    if (currentViewUid !== currentUser?.uid) return;
+    if (e.target.closest('.home-nav, .home-menu-btn, .home-menu-dropdown, .home-menu-overlay, .home-profile-bar')) return;
+    openEditProfileModal();
+  });
+}
 
 document.addEventListener('click', () => userMenu.classList.remove('open'));
 userMenu.addEventListener('click', e => e.stopPropagation());
@@ -467,12 +471,6 @@ function setAvatarDisplay(url) {
   btnAvatar.style.display = 'block';
   initials.style.display  = 'none';
 
-  const homeAvatar   = document.getElementById('home-user-avatar');
-  const homeInitials = document.getElementById('home-user-initials');
-  homeAvatar.src           = url;
-  homeAvatar.style.display = 'block';
-  homeInitials.style.display = 'none';
-
   const menuImg     = document.getElementById('user-menu-avatar-img');
   const menuInitial = document.getElementById('user-menu-avatar-initial');
   menuImg.src             = url;
@@ -483,8 +481,6 @@ function setAvatarDisplay(url) {
 function clearAvatarDisplay() {
   document.getElementById('user-btn-avatar').style.display    = 'none';
   document.getElementById('user-initials').style.display      = '';
-  document.getElementById('home-user-avatar').style.display   = 'none';
-  document.getElementById('home-user-initials').style.display = '';
   document.getElementById('user-menu-avatar-img').style.display     = 'none';
   document.getElementById('user-menu-avatar-initial').style.display = '';
 }
@@ -602,7 +598,6 @@ const ACCENT_GRADIENTS = {
   '#7c5ce5': ['#4a00e0', '#a78bfa'],
 };
 let epSelectedColor  = null;
-let epSelectedAvatar = null;
 let epSelectedCover  = null;
 
 function applyAccentColor(color) {
@@ -614,53 +609,43 @@ function applyAccentColor(color) {
   }
 }
 
-// ── Image picker modal ───────────────────────────────────────
-let _imgPickerMode = null; // 'avatar' | 'cover'
+// ── Image picker modal (couverture) ──────────────────────────
 let _imgPickerSelected = null;
 
-function openImgPicker(mode) {
-  _imgPickerMode = mode;
-  _imgPickerSelected = mode === 'cover' ? epSelectedCover : epSelectedAvatar;
+function openImgPicker() {
+  _imgPickerSelected = epSelectedCover;
 
   const modal = document.getElementById('img-picker-modal');
   const grid  = document.getElementById('img-picker-grid');
   const title = document.getElementById('img-picker-title');
   const search = document.getElementById('img-picker-search');
 
-  title.textContent = mode === 'cover' ? 'Image de couverture' : 'Photo de profil';
+  title.textContent = 'Image de couverture';
   search.value = '';
-  grid.className = 'img-picker-grid ' + (mode === 'cover' ? 'grid-cover' : 'grid-avatar');
+  grid.className = 'img-picker-grid grid-cover';
   modal.classList.remove('hidden');
   renderImgPickerGrid('');
   search.focus();
 }
 
-const IMG_PICKER_PAGE = 10;
+const IMG_PICKER_MAX = 8;
 
-function renderImgPickerGrid(query, visibleCount = IMG_PICKER_PAGE) {
+function renderImgPickerGrid(query) {
   const grid = document.getElementById('img-picker-grid');
   const q = query.toLowerCase();
   grid.innerHTML = '';
 
-  let items;
-  if (_imgPickerMode === 'cover') {
-    const seen = new Set();
-    items = [...films, ...series, ...anime].filter(i => i.backdrop && !seen.has(i.backdrop) && seen.add(i.backdrop))
-      .filter(i => !q || i.title?.toLowerCase().includes(q))
-      .map(i => ({ url: i.backdrop, label: i.title, ratio: '16/9' }));
-  } else {
-    const seen = new Set();
-    items = [...films, ...series, ...anime].filter(i => i.poster && !seen.has(i.poster) && seen.add(i.poster))
-      .filter(i => !q || i.title?.toLowerCase().includes(q))
-      .map(i => ({ url: i.poster, label: i.title, ratio: '2/3' }));
-  }
+  const seen = new Set();
+  const items = [...films, ...series, ...anime].filter(i => i.backdrop && !seen.has(i.backdrop) && seen.add(i.backdrop))
+    .filter(i => !q || i.title?.toLowerCase().includes(q))
+    .map(i => ({ url: i.backdrop, label: i.title, ratio: '16/9' }));
 
   if (!items.length) {
     grid.innerHTML = '<p style="font-size:12px;color:#555;grid-column:1/-1;padding:12px 0">Aucun résultat.</p>';
     return;
   }
 
-  items.slice(0, visibleCount).forEach(({ url, label, ratio }) => {
+  items.slice(0, IMG_PICKER_MAX).forEach(({ url, label, ratio }) => {
     const btn = document.createElement('button');
     btn.className = 'ep-cover-item' + (url === _imgPickerSelected ? ' selected' : '');
     btn.style.aspectRatio = ratio;
@@ -673,39 +658,21 @@ function renderImgPickerGrid(query, visibleCount = IMG_PICKER_PAGE) {
     });
     grid.appendChild(btn);
   });
-
-  if (items.length > visibleCount) {
-    const more = document.createElement('button');
-    more.className = 'admin-list-more-btn';
-    more.style.gridColumn = '1 / -1';
-    more.textContent = `Voir ${Math.min(IMG_PICKER_PAGE, items.length - visibleCount)} de plus`;
-    more.addEventListener('click', () => renderImgPickerGrid(query, visibleCount + IMG_PICKER_PAGE));
-    grid.appendChild(more);
-  }
 }
 
 function closeImgPicker() {
   document.getElementById('img-picker-modal').classList.add('hidden');
-  _imgPickerMode = null;
 }
 
 document.getElementById('img-picker-search').addEventListener('input', e => {
-  renderImgPickerGrid(e.target.value.trim(), IMG_PICKER_PAGE);
+  renderImgPickerGrid(e.target.value.trim());
 });
 document.getElementById('img-picker-close').addEventListener('click', closeImgPicker);
 document.getElementById('img-picker-cancel').addEventListener('click', closeImgPicker);
 document.getElementById('img-picker-confirm').addEventListener('click', () => {
-  if (_imgPickerMode === 'cover') {
-    epSelectedCover = _imgPickerSelected;
-    const coverImg = document.getElementById('ep-cover-img');
-    if (coverImg) coverImg.src = epSelectedCover || '';
-  } else {
-    epSelectedAvatar = _imgPickerSelected;
-    const preview = document.getElementById('ep-avatar-preview');
-    if (epSelectedAvatar) {
-      preview.innerHTML = `<img src="${epSelectedAvatar}" alt="avatar" />`;
-    }
-  }
+  epSelectedCover = _imgPickerSelected;
+  const coverImg = document.getElementById('ep-cover-img');
+  if (coverImg) coverImg.src = epSelectedCover || '';
   closeImgPicker();
 });
 
@@ -715,20 +682,8 @@ function openEditProfileModal() {
   db.ref(`profiles/${currentUser.uid}`).once('value').then(snap => {
     const p = snap.val() || {};
     document.getElementById('ep-name-input').value = p.name || '';
-    document.getElementById('ep-desc-input').value = p.description || '';
 
-    epSelectedAvatar = p.avatar || null;
-    epSelectedColor  = p.accentColor || ACCENT_COLORS[0];
-
-    const preview = document.getElementById('ep-avatar-preview');
-    if (p.avatar) {
-      preview.innerHTML = `<img src="${p.avatar}" alt="avatar" />`;
-    } else {
-      const initial = (p.name || '?')[0].toUpperCase();
-      preview.innerHTML = `<div class="ep-avatar-initial" style="background:${avatarColor(currentUser.uid)}">${initial}</div>`;
-    }
-    preview.style.borderColor = epSelectedColor;
-
+    epSelectedColor = p.accentColor || ACCENT_COLORS[0];
     epSelectedCover = p.coverImage || null;
     const coverImg = document.getElementById('ep-cover-img');
     if (coverImg) coverImg.src = epSelectedCover || '';
@@ -752,7 +707,6 @@ function renderEpColorSwatches(selectedColor) {
       epSelectedColor = color;
       container.querySelectorAll('.ep-color-swatch').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
-      document.getElementById('ep-avatar-preview').style.borderColor = color;
     });
     container.appendChild(btn);
   });
@@ -765,7 +719,6 @@ async function saveEditProfile() {
   saveBtn.disabled = true;
 
   const name = document.getElementById('ep-name-input').value.trim();
-  const desc = document.getElementById('ep-desc-input').value.trim();
   const updates = {};
 
   if (name) {
@@ -773,18 +726,8 @@ async function saveEditProfile() {
     updates[`profiles/${currentUser.uid}/name`] = name;
     document.getElementById('user-pseudo-display').textContent = name;
     document.getElementById('user-initials').textContent            = name[0].toUpperCase();
-    document.getElementById('home-user-initials').textContent       = name[0].toUpperCase();
     document.getElementById('user-menu-avatar-initial').textContent = name[0].toUpperCase();
-    document.getElementById('home-app-title').textContent           = name;
     try { await currentUser.updateProfile({ displayName: name }); } catch(_) {}
-  }
-  updates[`users/${currentUser.uid}/description`]    = desc || null;
-  updates[`profiles/${currentUser.uid}/description`] = desc || null;
-
-  if (epSelectedAvatar) {
-    updates[`users/${currentUser.uid}/avatar`]    = epSelectedAvatar;
-    updates[`profiles/${currentUser.uid}/avatar`] = epSelectedAvatar;
-    setAvatarDisplay(epSelectedAvatar);
   }
   if (epSelectedColor) {
     updates[`users/${currentUser.uid}/accentColor`]    = epSelectedColor;
@@ -816,12 +759,12 @@ function closeEditProfileModal() {
 }
 
 document.getElementById('edit-profile-btn').addEventListener('click', openEditProfileModal);
-document.getElementById('ep-cover-zone').addEventListener('click', () => openImgPicker('cover'));
-document.getElementById('ep-change-avatar-btn').addEventListener('click', () => openImgPicker('avatar'));
-document.getElementById('ep-avatar-preview').addEventListener('click', () => openImgPicker('avatar'));
-document.getElementById('edit-profile-close').addEventListener('click', closeEditProfileModal);
+document.getElementById('ep-cover-zone').addEventListener('click', () => openImgPicker());
 document.getElementById('ep-cancel-btn').addEventListener('click', closeEditProfileModal);
 document.getElementById('ep-save-btn').addEventListener('click', saveEditProfile);
+document.getElementById('ep-followers-btn').addEventListener('click', () => { closeEditProfileModal(); openFollowListModal('followers'); });
+document.getElementById('ep-following-btn').addEventListener('click', () => { closeEditProfileModal(); openFollowListModal('following'); });
+document.getElementById('ep-logout-btn').addEventListener('click', async () => { closeEditProfileModal(); await auth.signOut(); });
 editProfileModal.addEventListener('click', e => { if (e.target === editProfileModal) closeEditProfileModal(); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
@@ -839,6 +782,7 @@ function switchToUser(uid) {
   loadUserData(uid);
   userMenu.classList.remove('open');
   updateViewingBanner();
+  window.setHomeActiveTab?.('profil');
   if (currentUser && uid !== currentUser.uid) {
     homePage.classList.remove('hidden');
     mainApp.classList.add('hidden');
@@ -906,44 +850,22 @@ async function updateHomeHeaderForUid(uid) {
   const snap = await db.ref(`profiles/${uid}`).once('value');
   const p = snap.val() || {};
   const name = p.name || 'Utilisateur';
-  document.getElementById('home-app-title').textContent = name;
-  const initials = document.getElementById('home-user-initials');
-  const avatar   = document.getElementById('home-user-avatar');
-  initials.textContent = name[0]?.toUpperCase() || '?';
-  if (p.avatar) {
-    avatar.src = p.avatar;
-    avatar.style.display = 'block';
-    initials.style.display = 'none';
-  } else {
-    avatar.style.display = 'none';
-    initials.style.display = '';
-  }
   document.getElementById('home-viewing-name').textContent = name;
-  const descElGuest = document.getElementById('home-app-desc');
-  if (descElGuest) descElGuest.textContent = p.description || '';
   applyAccentColor(p.accentColor || ACCENT_COLORS[0]);
-  const homeNav     = document.querySelector('.home-nav');
-  const homeLogo    = document.querySelector('.home-logo');
-  const homeMenuBtn = document.getElementById('home-menu-btn');
-  if (homeNav)     homeNav.style.display     = 'none';
-  if (homeLogo)    homeLogo.style.display    = 'none';
-  if (homeMenuBtn) homeMenuBtn.style.display = 'none';
+  const homeNav       = document.querySelector('.home-nav');
+  const homeLogo      = document.querySelector('.home-logo');
+  const homeMenuBtn   = document.getElementById('home-menu-btn');
+  const homeBottomBar = document.querySelector('.home-bottombar');
+  if (homeNav)        homeNav.style.display       = 'none';
+  if (homeLogo)        homeLogo.style.display      = 'none';
+  if (homeMenuBtn)     homeMenuBtn.style.display   = 'none';
+  if (homeBottomBar)   homeBottomBar.style.display = 'none';
   updateHomeViewingBanner();
 
   // Follow button in viewing banner (banner btn, kept for back-button row)
   const bannerFollowBtn = document.getElementById('home-follow-btn');
   if (bannerFollowBtn) bannerFollowBtn.classList.add('hidden');
 
-  // Follow button above home-app-title
-  const headerFollowBtn = document.getElementById('home-header-follow-btn');
-  if (headerFollowBtn && currentUser) {
-    headerFollowBtn.classList.remove('hidden');
-    updateFollowBtn(headerFollowBtn, uid);
-    const freshBtn = headerFollowBtn.cloneNode(true);
-    headerFollowBtn.parentNode.replaceChild(freshBtn, headerFollowBtn);
-    updateFollowBtn(freshBtn, uid);
-    freshBtn.addEventListener('click', () => handleFollowClick(freshBtn, uid));
-  }
   const filmsTitle    = document.getElementById('home-strip-films-title');
   const seriesTitle   = document.getElementById('home-strip-series-title');
   const watchTitle    = document.getElementById('home-strip-watchlist-title');
@@ -956,21 +878,6 @@ function restoreOwnHomeHeader() {
   if (!currentUser) return;
   db.ref(`users/${currentUser.uid}`).once('value').then(snap => {
     const d = snap.val() || {};
-    const name = d.name || currentUser.displayName || '?';
-    document.getElementById('home-app-title').textContent = name;
-    const initials = document.getElementById('home-user-initials');
-    const avatar   = document.getElementById('home-user-avatar');
-    initials.textContent = name[0]?.toUpperCase() || '?';
-    if (d.avatar) {
-      avatar.src = d.avatar;
-      avatar.style.display = 'block';
-      initials.style.display = 'none';
-    } else {
-      avatar.style.display = 'none';
-      initials.style.display = '';
-    }
-    const descElOwn = document.getElementById('home-app-desc');
-    if (descElOwn) descElOwn.textContent = d.description || '';
     applyAccentColor(d.accentColor || ACCENT_COLORS[0]);
     const filmsTitle  = document.getElementById('home-strip-films-title');
     const seriesTitle = document.getElementById('home-strip-series-title');
@@ -978,14 +885,14 @@ function restoreOwnHomeHeader() {
     if (filmsTitle)  filmsTitle.textContent  = 'Films visionnés';
     if (seriesTitle) seriesTitle.textContent = 'Séries visionnées';
     if (watchTitle)  watchTitle.textContent  = 'Ma Watchlist';
-    const homeNav     = document.querySelector('.home-nav');
-    const homeLogo    = document.querySelector('.home-logo');
-    const homeMenuBtn = document.getElementById('home-menu-btn');
-    if (homeNav)     homeNav.style.display     = '';
-    if (homeLogo)    homeLogo.style.display    = '';
-    if (homeMenuBtn) homeMenuBtn.style.display = '';
-    const hfb = document.getElementById('home-header-follow-btn');
-    if (hfb) hfb.classList.add('hidden');
+    const homeNav       = document.querySelector('.home-nav');
+    const homeLogo      = document.querySelector('.home-logo');
+    const homeMenuBtn   = document.getElementById('home-menu-btn');
+    const homeBottomBar = document.querySelector('.home-bottombar');
+    if (homeNav)        homeNav.style.display       = '';
+    if (homeLogo)        homeLogo.style.display      = '';
+    if (homeMenuBtn)     homeMenuBtn.style.display   = '';
+    if (homeBottomBar)   homeBottomBar.style.display = '';
   });
 }
 
@@ -1402,6 +1309,27 @@ function navigateToApp(tab, customListId = null) {
   else render();
 }
 
+let _ownCoverImageUrl = null;
+
+function setHomeCoverImage(url) {
+  const bg = document.getElementById('home-header-bg');
+  if (!bg) return;
+  if (!url) {
+    bg.style.display = 'none';
+    bg.style.opacity = '';
+    bg.style.transition = '';
+    return;
+  }
+  bg.style.transition = 'none';
+  bg.style.opacity = '0';
+  bg.src = url;
+  bg.style.display = 'block';
+  requestAnimationFrame(() => {
+    bg.style.transition = 'opacity 0.7s ease';
+    bg.style.opacity = '0.2';
+  });
+}
+
 function populateHomePage() {
   fillStrip('home-strip-films',     [...films].sort((a, b) => (b.stars || 0) - (a.stars || 0)), films.length, 'films', window.innerWidth <= 700 ? 6 : 10, 2);
   fillStrip('home-strip-series',    [...series, ...anime].sort((a, b) => (b.stars || 0) - (a.stars || 0)), series.length + anime.length, 'series', window.innerWidth <= 700 ? 6 : 10, 2);
@@ -1419,21 +1347,8 @@ function populateHomePage() {
   const coverImg = document.getElementById('home-header-bg');
   if (coverImg) {
     db.ref(`profiles/${currentViewUid}/coverImage`).once('value').then(snap => {
-      const saved = snap.val();
-      if (saved) {
-        coverImg.style.transition = 'none';
-        coverImg.style.opacity = '0';
-        coverImg.src = saved;
-        coverImg.style.display = 'block';
-        requestAnimationFrame(() => {
-          coverImg.style.transition = 'opacity 0.7s ease';
-          coverImg.style.opacity = '1';
-        });
-      } else {
-        coverImg.style.display = 'none';
-        coverImg.style.opacity = '';
-        coverImg.style.transition = '';
-      }
+      _ownCoverImageUrl = snap.val() || null;
+      setHomeCoverImage(_ownCoverImageUrl);
     });
   }
 
@@ -2372,10 +2287,6 @@ auth.onAuthStateChanged(async user => {
       document.getElementById('user-pseudo-display').textContent = pseudo;
       document.getElementById('user-menu-avatar-initial').textContent = pseudo[0].toUpperCase();
       document.getElementById('user-initials').textContent            = pseudo[0].toUpperCase();
-      document.getElementById('home-user-initials').textContent       = pseudo[0].toUpperCase();
-      document.getElementById('home-app-title').textContent           = pseudo;
-      const descEl = document.getElementById('home-app-desc');
-      if (descEl) descEl.textContent = d.description || '';
       if (d.avatar) setAvatarDisplay(d.avatar);
       if (d.accentColor) applyAccentColor(d.accentColor);
     });
@@ -2997,140 +2908,109 @@ if (homeSearchTitleEl) {
 // ── Home search (TMDB) ──────────────────────────────────────────
 const homeSearchInput = document.getElementById('home-search');
 const homeSearchClear = document.getElementById('home-search-clear');
-const homeSuggestionList = document.createElement('ul');
-homeSuggestionList.className = 'search-suggestions';
-document.body.appendChild(homeSuggestionList);
-
-function positionHomeSuggestions() {
-  const rect = homeSearchInput.parentElement.getBoundingClientRect();
-  homeSuggestionList.style.top   = (rect.bottom + 6) + 'px';
-  homeSuggestionList.style.left  = rect.left + 'px';
-  homeSuggestionList.style.right = (window.innerWidth - rect.right) + 'px';
-  homeSuggestionList.style.width = '';
-}
-window.addEventListener('resize', () => {
-  if (homeSuggestionList.style.display === 'block') positionHomeSuggestions();
-});
 
 function updateHomeSearchClear() {
   homeSearchInput.closest('.search-bar').classList.toggle('has-value', homeSearchInput.value.length > 0);
 }
 
-const TMDB_SUGGESTION_LABEL = { movie: 'Film', tv: 'Série', person: 'Personne' };
-let _homeSearchToken     = 0;
-let _homeSearchDebounce  = null;
-let _homeSuggestionItems = [];
+let _homeSearchToken    = 0;
+let _homeSearchDebounce = null;
 
-async function fetchTmdbSuggestions(query) {
-  const json = await adminTmdbFetch(`/search/multi?query=${encodeURIComponent(query)}&include_adult=false`);
-  return (json.results || [])
-    .filter(r => r.media_type === 'movie' || r.media_type === 'tv' || r.media_type === 'person')
-    .slice(0, 8)
-    .map(r => ({
-      id:   r.id,
-      type: r.media_type,
-      text: r.media_type === 'movie' ? r.title : r.name,
-      year: r.media_type === 'movie' ? r.release_date?.slice(0, 4) : r.media_type === 'tv' ? r.first_air_date?.slice(0, 4) : '',
-    }));
+async function fetchHomeSearchResults(query) {
+  const [moviesJson, tvJson, peopleJson] = await Promise.all([
+    adminTmdbFetch(`/search/movie?query=${encodeURIComponent(query)}&include_adult=false`),
+    adminTmdbFetch(`/search/tv?query=${encodeURIComponent(query)}&include_adult=false`),
+    adminTmdbFetch(`/search/person?query=${encodeURIComponent(query)}&include_adult=false`),
+  ]);
+  const movies = (moviesJson.results || []).map(r => ({ ...r, media_type: 'movie' }));
+  const shows  = (tvJson.results || []).map(r => ({ ...r, media_type: 'tv' }));
+  const titles = [...movies, ...shows].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  return { titles, people: peopleJson.results || [] };
 }
 
-function renderHomeSuggestions(items) {
-  _homeSuggestionItems = items;
-  if (!items.length) {
-    homeSuggestionList.innerHTML = '<li class="suggestion-item suggestion-loading">Aucun résultat.</li>';
-    positionHomeSuggestions();
-    homeSuggestionList.style.display = 'block';
-    return;
+async function runHomeSearch(query) {
+  const token = ++_homeSearchToken;
+  document.getElementById('home-search-discover')?.classList.remove('hidden');
+  document.getElementById('search-page-empty')?.classList.add('hidden');
+  try {
+    let { titles, people } = await fetchHomeSearchResults(query);
+    // Marge d'erreur de 2 caractères : si rien ne correspond, on retente
+    // en retirant jusqu'à 2 caractères de fin de requête (tolère les fautes de frappe).
+    if (!titles.length && !people.length && query.length > 4) {
+      const fallback = await fetchHomeSearchResults(query.slice(0, -2));
+      titles = fallback.titles;
+      people = fallback.people;
+    }
+    if (token !== _homeSearchToken) return;
+    const isMobile  = window.innerWidth <= 700;
+    const maxFilms  = isMobile ? 4 : 5;
+    const maxActors = isMobile ? 4 : 5;
+    const actors    = people.filter(p => p.known_for_department === 'Acting').slice(0, maxActors);
+    const directors = people.filter(p => p.known_for_department === 'Directing').slice(0, 3);
+    renderSearchDiscoverFilms(titles.slice(0, maxFilms));
+    renderSearchDiscoverActors(actors);
+    renderSearchDiscoverDirectors(directors);
+    renderHomeSearchSuggestions(titles);
+  } catch (e) {
+    if (token !== _homeSearchToken) return;
+    renderSearchDiscoverFilms([]);
+    renderSearchDiscoverActors([]);
+    renderSearchDiscoverDirectors([]);
+    renderHomeSearchSuggestions([]);
   }
-  homeSuggestionList.innerHTML = items.map((item, i) =>
-    `<li class="suggestion-item" data-index="${i}">
-      <span>${item.text}${item.year ? ` (${item.year})` : ''}</span>
-      <span class="suggestion-type">${TMDB_SUGGESTION_LABEL[item.type]}</span>
-    </li>`
-  ).join('');
-  positionHomeSuggestions();
-  homeSuggestionList.style.display = 'block';
+}
 
-  homeSuggestionList.querySelectorAll('.suggestion-item').forEach(el => {
-    el.addEventListener('mousedown', e => {
-      e.preventDefault();
-      selectHomeSuggestion(_homeSuggestionItems[parseInt(el.dataset.index)]);
+function renderHomeSearchSuggestions(titles) {
+  const container = document.getElementById('home-search-suggestions');
+  if (!container) return;
+  container.innerHTML = '';
+  const currentQuery = homeSearchInput.value.trim().toLowerCase();
+  const seen = new Set();
+  titles.forEach(item => {
+    const label = item.title || item.name || '';
+    const key   = label.toLowerCase();
+    if (!label || key === currentQuery || seen.has(key)) return;
+    seen.add(key);
+    if (seen.size > 5) return;
+    const badge = document.createElement('button');
+    badge.className = 'home-search-suggestion-badge';
+    badge.textContent = label;
+    badge.addEventListener('click', () => {
+      homeSearchInput.value = label;
+      updateHomeSearchClear();
+      clearTimeout(_homeSearchDebounce);
+      runHomeSearch(label);
     });
+    container.appendChild(badge);
   });
 }
 
-async function showHomeSuggestions(query) {
-  if (!query || query.length < 2) {
-    _homeSuggestionItems = [];
-    homeSuggestionList.innerHTML = '<li class="suggestion-item suggestion-loading">Rechercher un film, un acteur, un réalisateur…</li>';
-    positionHomeSuggestions();
-    homeSuggestionList.style.display = 'block';
-    return;
-  }
-  const token = ++_homeSearchToken;
-  homeSuggestionList.innerHTML = '<li class="suggestion-item suggestion-loading">Recherche…</li>';
-  positionHomeSuggestions();
-  homeSuggestionList.style.display = 'block';
-  try {
-    const items = await fetchTmdbSuggestions(query);
-    if (token !== _homeSearchToken) return;
-    renderHomeSuggestions(items);
-  } catch (e) {
-    if (token !== _homeSearchToken) return;
-    homeSuggestionList.innerHTML = '<li class="suggestion-item suggestion-loading">Erreur de recherche.</li>';
-  }
-}
-
-function selectHomeSuggestion(item) {
-  if (!item) return;
-  homeSuggestionList.style.display = 'none';
-  homeSearchInput.value = '';
-  updateHomeSearchClear();
-  if (item.type === 'person') openPersonFilmography(item.id, item.text);
-  else openTmdbItemModal(item.id, item.type);
+function resetHomeSearchDiscover() {
+  _homeSearchToken++;
+  document.getElementById('home-search-discover')?.classList.add('hidden');
+  document.getElementById('search-page-empty')?.classList.remove('hidden');
+  document.getElementById('home-search-discover-films').innerHTML = '';
+  document.getElementById('home-search-discover-actors').innerHTML = '';
+  document.getElementById('home-search-discover-directors').innerHTML = '';
+  document.getElementById('home-search-suggestions').innerHTML = '';
 }
 
 homeSearchInput.addEventListener('input', () => {
   updateHomeSearchClear();
   clearTimeout(_homeSearchDebounce);
   const query = homeSearchInput.value.trim();
-  _homeSearchDebounce = setTimeout(() => showHomeSuggestions(query), 350);
+  if (query.length < 2) {
+    resetHomeSearchDiscover();
+    return;
+  }
+  _homeSearchDebounce = setTimeout(() => runHomeSearch(query), 350);
 });
 homeSearchInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     e.preventDefault();
     clearTimeout(_homeSearchDebounce);
-    if (_homeSuggestionItems.length) selectHomeSuggestion(_homeSuggestionItems[0]);
-  }
-});
-homeSearchInput.addEventListener('blur', () => {
-  homeSuggestionList.style.display = 'none';
-  document.querySelector('.home-header')?.classList.remove('search-focused');
-  document.querySelector('.home-content')?.classList.remove('search-active');
-});
-homeSearchInput.addEventListener('focus', () => {
-  // Différé d'une frame : sur mobile, déclencher tout de suite le rétrécissement
-  // du header (reflow) pendant le focus peut empêcher le clavier de s'afficher
-  // au premier tap (iOS Safari notamment).
-  requestAnimationFrame(() => {
-    document.querySelector('.home-header')?.classList.add('search-focused');
-    document.querySelector('.home-content')?.classList.add('search-active');
-  });
-  const query = homeSearchInput.value.trim();
-  // Attendre la fin de l'animation de rétrécissement du header avant de
-  // positionner le dropdown, sinon il se cale sur la position pré-animation.
-  if (query.length < 2) {
-    // Trop court pour chercher (ou vide), mais on affiche quand même une indication.
-    setTimeout(() => {
-      if (document.activeElement !== homeSearchInput) return;
-      showHomeSuggestions(query);
-    }, 220);
-  } else if (_homeSuggestionItems.length) {
-    setTimeout(() => {
-      if (document.activeElement !== homeSearchInput) return;
-      positionHomeSuggestions();
-      homeSuggestionList.style.display = 'block';
-    }, 220);
+    const query = homeSearchInput.value.trim();
+    if (query.length >= 2) runHomeSearch(query);
   }
 });
 homeSearchClear.addEventListener('mousedown', e => {
@@ -3140,7 +3020,8 @@ homeSearchClear.addEventListener('mousedown', e => {
 homeSearchClear.addEventListener('click', () => {
   homeSearchInput.value = '';
   updateHomeSearchClear();
-  showHomeSuggestions('');
+  clearTimeout(_homeSearchDebounce);
+  resetHomeSearchDiscover();
 });
 
 // ── TMDB item modal / person filmography ─────────────────────
@@ -3219,7 +3100,7 @@ async function openPersonFilmography(id, name) {
   const modal   = document.getElementById('person-search-modal');
   const titleEl = document.getElementById('person-search-title');
   const grid    = document.getElementById('person-search-grid');
-  titleEl.textContent = name;
+  titleEl.innerHTML = `<a class="person-search-title-link" href="https://www.themoviedb.org/person/${id}" target="_blank" rel="noopener noreferrer">${name}</a>`;
   grid.innerHTML = '<p class="tmdb-msg">Chargement…</p>';
   modal.classList.remove('hidden');
 
@@ -3272,12 +3153,71 @@ async function openPersonFilmography(id, name) {
   }
 }
 
+// ── Résultats de recherche (onglet Recherche) ────────────────────
+function renderSearchDiscoverFilms(list) {
+  const container = document.getElementById('home-search-discover-films');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!list.length) {
+    container.innerHTML = '<p class="home-search-discover-none">Aucun résultat.</p>';
+    return;
+  }
+  list.forEach(item => {
+    const title = item.title || item.name || '';
+    const type  = item.media_type || 'movie';
+    const badge = type === 'tv' ? 'Série' : 'Film';
+    const card = document.createElement('div');
+    card.className = 'home-search-discover-film';
+    card.innerHTML = (item.poster_path
+      ? `<img src="${TMDB_IMG}${item.poster_path}" alt="${title}" loading="lazy" />`
+      : `<div class="home-search-discover-empty">${title}</div>`)
+      + `<span class="home-search-discover-type-badge">${badge}</span>`
+      + `<span class="home-search-discover-film-name">${title}</span>`;
+    card.title = title;
+    card.addEventListener('click', () => openTmdbItemModal(item.id, type, card));
+    container.appendChild(card);
+  });
+}
+
+function renderPersonGrid(containerId, list) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  if (!list.length) {
+    container.innerHTML = '<p class="home-search-discover-none">Aucun résultat.</p>';
+    return;
+  }
+  list.forEach(person => {
+    const el = document.createElement('a');
+    el.className = 'home-search-discover-person';
+    el.href = `https://www.themoviedb.org/person/${person.id}`;
+    el.target = '_blank';
+    el.rel = 'noopener noreferrer';
+    el.innerHTML = person.profile_path
+      ? `<img class="home-search-discover-person-photo" src="https://image.tmdb.org/t/p/w185${person.profile_path}" alt="${person.name}" loading="lazy" />`
+      : `<span class="home-search-discover-person-photo home-search-discover-person-initial">${person.name?.[0] || '?'}</span>`;
+    el.innerHTML += `<span class="home-search-discover-person-name">${person.name}</span>`;
+    container.appendChild(el);
+  });
+}
+
+function renderSearchDiscoverActors(list) {
+  renderPersonGrid('home-search-discover-actors', list);
+}
+
+function renderSearchDiscoverDirectors(list) {
+  renderPersonGrid('home-search-discover-directors', list);
+}
+
 // ── Modal ──────────────────────────────────────────────────
 const modalBackdrop = document.getElementById('modal-backdrop');
 const modalEl       = document.getElementById('modal-card');
 const modalClose    = document.getElementById('modal-close');
 
+let _modalOpenToken = 0;
+
 function openModal(item, triggerEl) {
+  const modalToken = ++_modalOpenToken;
   document.getElementById('modal-title').textContent = item.title;
   document.getElementById('modal-year').textContent = item.year ?? '';
   const durEl = document.getElementById('modal-duration');
@@ -3312,9 +3252,6 @@ function openModal(item, triggerEl) {
     };
   });
 
-  const personLink = name =>
-    `<span class="modal-person" data-search="${name.replace(/"/g, '&quot;')}">${name}</span>`;
-
   const dirEl = document.getElementById('modal-director');
   const castEl = document.getElementById('modal-cast');
   const castCardEl = document.getElementById('modal-cast-card');
@@ -3327,19 +3264,15 @@ function openModal(item, triggerEl) {
     const lines = [];
     if (item.seasons) lines.push(`${item.seasons} saison${item.seasons > 1 ? 's' : ''}`);
     lines.push(`<span class="series-info-label">Nombre total d'épisodes :</span> ${item.episodes}`);
-    lines.push(`<span class="series-info-label">Durée moy. estimée des épisodes :</span> ${item.duration} min`);
-    const totalH = Math.round(item.episodes * item.duration / 60);
-    lines.push(`<span class="series-info-label">Durée totale estimée :</span> ${totalH}h`);
     seriesInfoEl.innerHTML = lines.join('<br>');
   } else {
     dirEl.style.display = '';
     seriesInfoEl.style.display = 'none';
     if (item.director) {
-      const dirName = personLink(item.director);
-      const dirLink = item.directorId
-        ? `<a class="modal-director-tmdb" href="https://www.themoviedb.org/person/${item.directorId}" target="_blank" rel="noopener noreferrer">${dirName}</a>`
-        : dirName;
-      dirEl.innerHTML = `Réalisateur: ${dirLink}`;
+      const dirTmdbUrl = item.directorId
+        ? `https://www.themoviedb.org/person/${item.directorId}`
+        : `https://www.google.com/search?q=${encodeURIComponent(item.director + ' site:themoviedb.org')}`;
+      dirEl.innerHTML = `Réalisateur: <a class="modal-director-tmdb" href="${dirTmdbUrl}" target="_blank" rel="noopener noreferrer">${item.director}</a>`;
     } else {
       dirEl.innerHTML = '';
     }
@@ -3354,11 +3287,11 @@ function openModal(item, triggerEl) {
         const person = catalogCache.people[catalogKey(name)];
         const badge  = document.createElement('a');
         badge.className = 'modal-cast-badge';
-        if (person?.tmdbId) {
-          badge.href   = `https://www.themoviedb.org/person/${person.tmdbId}`;
-          badge.target = '_blank';
-          badge.rel    = 'noopener noreferrer';
-        }
+        badge.href   = person?.tmdbId
+          ? `https://www.themoviedb.org/person/${person.tmdbId}`
+          : `https://www.google.com/search?q=${encodeURIComponent(name + ' site:themoviedb.org')}`;
+        badge.target = '_blank';
+        badge.rel    = 'noopener noreferrer';
         badge.innerHTML = `
           <div class="modal-cast-img-wrap">
             ${person?.profileImage
@@ -3377,24 +3310,41 @@ function openModal(item, triggerEl) {
     }
   }
 
-  document.querySelectorAll('.modal-person[data-search]').forEach(el => {
-    el.addEventListener('click', () => {
-      closeModal();
-      searchInput.value = el.dataset.search;
-      updateSearchClear();
-      const recSection = document.querySelector('.rec-section');
-      if (recSection) recSection.style.display = 'none';
-      const topSection = document.getElementById('top-section');
-      if (topSection) topSection.style.display = 'none';
-      updatePersonBadge(el.dataset.search);
-      render();
-    });
-  });
-
   const infoEl = document.getElementById('modal-link');
   infoEl.href = item.tmdbId && item.tmdbType
     ? `https://www.themoviedb.org/${item.tmdbType}/${item.tmdbId}`
     : `https://www.google.com/search?q=${encodeURIComponent(item.title + ' site:themoviedb.org')}`;
+
+  const playEl = document.getElementById('modal-play-btn');
+  if (playEl) {
+    playEl.classList.add('hidden');
+    // number_of_episodes peut être 0/absent pour certaines séries (ex: à venir),
+    // donc on se fie d'abord à tmdbType plutôt qu'à la simple présence d'épisodes.
+    const isSeries = item.tmdbType ? item.tmdbType === 'tv' : !!item.episodes;
+    const aetherType = isSeries ? 'tv' : 'movie';
+    const setPlayHref = (tmdbId) => {
+      const diacriticRe = new RegExp('[̀-ͯ]', 'g');
+      const slug = item.title
+        .normalize('NFD').replace(diacriticRe, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      playEl.href = `https://aether.cx/media/tmdb-${aetherType}-${tmdbId}-${slug}`;
+      playEl.classList.remove('hidden');
+    };
+    if (item.tmdbId) {
+      setPlayHref(item.tmdbId);
+    } else {
+      // Anciennes entrées ajoutées sans TMDB ID : on le retrouve par titre.
+      adminTmdbFetch(`/search/${aetherType}?query=${encodeURIComponent(item.title)}`)
+        .then(json => {
+          if (modalToken !== _modalOpenToken) return;
+          const match = json.results?.[0];
+          if (match) setPlayHref(match.id);
+        })
+        .catch(() => {});
+    }
+  }
 
   const trailerEl = document.getElementById('modal-trailer');
   trailerEl.onclick = null;
@@ -4011,27 +3961,34 @@ document.getElementById('home-strip-watchlist').addEventListener('click', () => 
 const _homeContent   = document.querySelector('.home-content');
 const _communityPage = document.getElementById('community-page');
 const _trendingPage  = document.getElementById('trending-page');
+const _searchPage    = document.getElementById('search-page');
 const _homeHeader    = document.querySelector('.home-header');
 
 function showHomeContent() {
   _communityPage.classList.add('hidden');
   hideTrendingPage();
   hidePublicationsPage();
+  hideSearchPage();
   _homeContent.style.display = '';
   _homeHeader.classList.remove('community-mode');
-  const bg = document.getElementById('home-header-bg');
-  if (bg && bg.src && bg.style.display !== 'none') {
-    bg.style.transition = 'none';
-    bg.style.opacity = '0';
-    requestAnimationFrame(() => {
-      bg.style.transition = 'opacity 0.7s ease';
-      bg.style.opacity = '1';
-    });
-  }
+}
+function showSearchPage() {
+  hidePublicationsPage();
+  hideTrendingPage();
+  _communityPage.classList.add('hidden');
+  _homeContent.style.display = 'none';
+  _homeHeader.classList.add('community-mode');
+  _searchPage.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  setTimeout(() => homeSearchInput?.focus(), 50);
+}
+function hideSearchPage() {
+  _searchPage.classList.add('hidden');
 }
 function showCommunityPage() {
   hidePublicationsPage();
   hideTrendingPage();
+  hideSearchPage();
   _homeContent.style.display = 'none';
   _homeHeader.classList.add('community-mode');
   _communityPage.classList.remove('hidden');
@@ -4040,6 +3997,7 @@ function showCommunityPage() {
 }
 function showTrendingPage() {
   hidePublicationsPage();
+  hideSearchPage();
   _communityPage.classList.add('hidden');
   _homeContent.style.display = 'none';
   _homeHeader.classList.add('community-mode');
@@ -4048,11 +4006,7 @@ function showTrendingPage() {
   loadTrendingPage();
 }
 function hideTrendingPage() {
-  const bg = document.getElementById('trending-bg');
-  if (bg) {
-    bg.classList.remove('visible');
-    setTimeout(() => { bg.src = ''; bg.style.display = 'none'; }, 800);
-  }
+  setHomeCoverImage(_ownCoverImageUrl);
   document.querySelectorAll('#trending-page .trending-section').forEach(el => el.classList.remove('visible'));
   _trendingPage.classList.add('hidden');
 }
@@ -4060,6 +4014,7 @@ function hideTrendingPage() {
 (function() {
   const navBtns     = document.querySelectorAll('.home-nav-btn');
   const menuItems   = document.querySelectorAll('.home-menu-item');
+  const bottomBtns  = document.querySelectorAll('.home-bottombar-btn');
   const menuBtn      = document.getElementById('home-menu-btn');
   const menuDropdown = document.getElementById('home-menu-dropdown');
   const menuOverlay  = document.getElementById('home-menu-overlay');
@@ -4067,11 +4022,15 @@ function hideTrendingPage() {
   function setActive(key) {
     navBtns.forEach(b => b.classList.remove('active'));
     menuItems.forEach(b => b.classList.remove('active'));
-    const navEl  = document.getElementById('home-nav-' + key);
-    const menuEl = document.getElementById('home-menu-' + key);
-    if (navEl)  navEl.classList.add('active');
-    if (menuEl) menuEl.classList.add('active');
+    bottomBtns.forEach(b => b.classList.remove('active'));
+    const navEl    = document.getElementById('home-nav-' + key);
+    const menuEl   = document.getElementById('home-menu-' + key);
+    const bottomEl = document.getElementById('home-bottombar-' + key);
+    if (navEl)    navEl.classList.add('active');
+    if (menuEl)   menuEl.classList.add('active');
+    if (bottomEl) bottomEl.classList.add('active');
   }
+  window.setHomeActiveTab = setActive;
   setActive('profil');
 
   function closeMenu() {
@@ -4101,11 +4060,6 @@ function hideTrendingPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     closeMenu();
   }
-  function handleActivity() {
-    setActive('activity');
-    showPublicationsPage();
-    closeMenu();
-  }
   function handleCommunity() {
     setActive('community');
     showCommunityPage();
@@ -4116,13 +4070,23 @@ function hideTrendingPage() {
     showTrendingPage();
     closeMenu();
   }
+  function handleSearch() {
+    setActive('search');
+    showSearchPage();
+    closeMenu();
+  }
 
   document.getElementById('home-nav-profil').addEventListener('click', handleProfil);
+  document.getElementById('home-nav-search').addEventListener('click', handleSearch);
   document.getElementById('home-nav-trending').addEventListener('click', handleTrending);
-  document.getElementById('home-nav-activity').addEventListener('click', handleActivity);
+  document.getElementById('home-nav-community').addEventListener('click', handleCommunity);
   document.getElementById('home-menu-profil').addEventListener('click', handleProfil);
+  document.getElementById('home-menu-search').addEventListener('click', handleSearch);
   document.getElementById('home-menu-trending').addEventListener('click', handleTrending);
-  document.getElementById('home-menu-activity').addEventListener('click', handleActivity);
+  document.getElementById('home-bottombar-profil').addEventListener('click', handleProfil);
+  document.getElementById('home-bottombar-search').addEventListener('click', handleSearch);
+  document.getElementById('home-bottombar-trending').addEventListener('click', handleTrending);
+  document.getElementById('home-bottombar-community').addEventListener('click', handleCommunity);
 })();
 
 
@@ -4132,7 +4096,7 @@ async function fetchAndImportTmdbList(endpoint) {
   const movies  = [];
   for (const r of results) {
     try {
-      const details = await adminTmdbFetch(`/movie/${r.id}?append_to_response=credits`);
+      const details = await adminTmdbFetch(`/movie/${r.id}?append_to_response=credits,watch/providers`);
       const title   = details.title || r.title;
       if (!title) continue;
       const shared = { title };
@@ -4154,7 +4118,12 @@ async function fetchAndImportTmdbList(endpoint) {
       }
       Object.keys(shared).forEach(k => shared[k] === undefined && delete shared[k]);
       await db.ref(`catalog/films/${catalogKey(title)}`).update(shared);
-      movies.push(shared);
+      // Disponibilité gratuite/pub (FR) : volatile, non persistée dans le catalogue partagé.
+      const providersFR = details['watch/providers']?.results?.FR;
+      const freeProviders = [...new Map(
+        [...(providersFR?.free || []), ...(providersFR?.ads || [])].map(p => [p.provider_id, p.provider_name])
+      ).values()];
+      movies.push({ ...shared, freeProviders });
     } catch (e) { /* skip */ }
   }
   return movies;
@@ -4184,12 +4153,7 @@ async function loadTrendingPage() {
     renderTrendingGrid(trending, 'trending-grid');
     renderTrendingGrid(upcoming, 'trending-upcoming-grid');
     renderTrendingGrid(free, 'trending-free-grid');
-    const bg = document.getElementById('trending-bg');
-    if (bg && trending[0]?.backdrop) {
-      bg.src = trending[0].backdrop;
-      bg.style.display = 'block';
-      requestAnimationFrame(() => bg.classList.add('visible'));
-    }
+    if (trending[0]?.backdrop) setHomeCoverImage(trending[0].backdrop);
     document.querySelectorAll('#trending-page .trending-section').forEach((el, i) => {
       setTimeout(() => el.classList.add('visible'), i * 150);
     });
@@ -4226,6 +4190,7 @@ function renderTrendingGrid(movies, gridId = 'trending-grid') {
       ${movie.poster
         ? `<img class="trending-card-poster" src="${movie.poster}" alt="${movie.title}" loading="lazy" />`
         : `<div class="trending-card-poster trending-card-poster-empty">${movie.title}</div>`}
+      ${movie.freeProviders?.length ? `<span class="trending-card-provider-badge">${movie.freeProviders[0]}</span>` : ''}
       <div class="trending-card-info">
         <p class="trending-card-title">${movie.title}</p>
         ${movie.releaseDate
@@ -5584,6 +5549,7 @@ function showPublicationsPage() {
   _homeContent.style.display = 'none';
   _communityPage.classList.add('hidden');
   hideTrendingPage();
+  hideSearchPage();
   _homeHeader.classList.add('community-mode');
   const pubPage = document.getElementById('publications-page');
   pubPage.classList.remove('hidden');
@@ -5638,16 +5604,16 @@ function renderCommunityGrid(entries) {
     grid.innerHTML = '<p class="community-empty">Aucun utilisateur trouvé</p>';
     return;
   }
-  filtered.forEach(({ uid, name, avatar, accentColor, titlesCount }, i) => {
+  filtered.forEach(({ uid, name, coverImage, accentColor, titlesCount }, i) => {
     const card = document.createElement('div');
     card.className = 'community-full-card';
     card.style.animationDelay = `${i * 60}ms`;
 
     const avatarDiv = document.createElement('div');
     avatarDiv.className = 'community-full-avatar';
-    if (avatar) {
+    if (coverImage) {
       const img = document.createElement('img');
-      img.src = avatar; img.alt = name;
+      img.src = coverImage; img.alt = name;
       avatarDiv.appendChild(img);
     } else {
       const span = document.createElement('span');
