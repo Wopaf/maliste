@@ -1,6 +1,6 @@
 {
-  "name": "PosterBoxd",
-  "short_name": "PosterBoxd",
+  "name": "wow",
+  "short_name": "wow",
   "description": "Suivez vos films et séries, notez-les et partagez-les avec vos amis.",
   "start_url": "./index.html",
   "scope": "./",
