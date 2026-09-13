@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="medias/icon-180.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -75,44 +75,45 @@
     </header>
     <div class="home-content">
       <section class="home-carousel" id="home-section-watchlist">
+        <div class="home-strip" id="home-strip-watchlist"></div>
         <div class="home-carousel-hdr">
           <div class="home-carousel-title-group">
             <h2 class="home-carousel-title" id="home-strip-watchlist-title">Ma Watchlist</h2>
             <span class="home-strip-badge" id="home-badge-watchlist"></span>
           </div>
         </div>
-        <div class="home-strip" id="home-strip-watchlist"></div>
       </section>
-      <section class="home-carousel" id="home-section-films">
-        <div class="home-carousel-hdr">
-          <div class="home-carousel-title-group">
-            <h2 class="home-carousel-title" id="home-strip-films-title">Films visionnés</h2>
-            <span class="home-strip-badge" id="home-badge-films"></span>
+      <div class="home-carousel-pair">
+        <section class="home-carousel" id="home-section-films">
+          <div class="home-strip" id="home-strip-films"></div>
+          <div class="home-carousel-hdr">
+            <div class="home-carousel-title-group">
+              <h2 class="home-carousel-title" id="home-strip-films-title">Films visionnés</h2>
+              <span class="home-strip-badge" id="home-badge-films"></span>
+            </div>
           </div>
-        </div>
-        <div class="home-strip" id="home-strip-films"></div>
-      </section>
-      <section class="home-carousel" id="home-section-series">
-        <div class="home-carousel-hdr">
-          <div class="home-carousel-title-group">
-            <h2 class="home-carousel-title" id="home-strip-series-title">Séries visionnées</h2>
-            <span class="home-strip-badge" id="home-badge-series"></span>
+        </section>
+        <section class="home-carousel" id="home-section-series">
+          <div class="home-strip" id="home-strip-series"></div>
+          <div class="home-carousel-hdr">
+            <div class="home-carousel-title-group">
+              <h2 class="home-carousel-title" id="home-strip-series-title">Séries visionnées</h2>
+              <span class="home-strip-badge" id="home-badge-series"></span>
+            </div>
           </div>
-        </div>
-        <div class="home-strip" id="home-strip-series"></div>
-      </section>
-      <hr class="home-divider">
+        </section>
+      </div>
       <div class="home-custom-lists-hdr">
         <h2 class="home-section-label hidden" id="home-custom-lists-label">Mes listes personnalisées</h2>
         <button class="home-new-list-btn hidden" id="home-new-list-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M451.5-131.5Q440-143 440-160v-280H160q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520h280v-280q0-17 11.5-28.5T480-840q17 0 28.5 11.5T520-800v280h280q17 0 28.5 11.5T840-480q0 17-11.5 28.5T800-440H520v280q0 17-11.5 28.5T480-120q-17 0-28.5-11.5Z"/></svg>
           <span class="home-new-list-btn-label">Nouvelle liste</span>
         </button>
       </div>
       <div id="home-custom-lists"></div>
       <hr class="home-divider">
       <section class="home-carousel" id="home-section-activity">
-        <h2 class="home-carousel-title">Fil d'activité</h2>
+        <h2 class="home-activity-title">Fil d'activité</h2>
         <div id="home-activity-list"></div>
       </section>
       <section class="home-migrate-section hidden" id="home-migrate-section" style="display:none!important">
@@ -185,17 +186,23 @@
           </svg>
         </button>
       </div>
-      <div class="home-search-suggestions" id="home-search-suggestions"></div>
+      <div class="home-search-filters" id="home-search-filters">
+        <button class="home-search-filter-badge active" id="home-search-filter-all" data-filter="all">Films et séries</button>
+        <button class="home-search-filter-badge" id="home-search-filter-movie" data-filter="movie">Films</button>
+        <button class="home-search-filter-badge" id="home-search-filter-tv" data-filter="tv">Séries</button>
+        <button class="home-search-filter-badge" id="home-search-filter-actors" data-filter="actors">Acteurs</button>
+        <button class="home-search-filter-badge" id="home-search-filter-directors" data-filter="directors">Réalisateurs</button>
+      </div>
       <div class="home-search-discover hidden" id="home-search-discover">
-        <div class="home-search-discover-group">
-          <p class="home-search-discover-label">Films & séries</p>
+        <div class="home-search-discover-group" id="home-search-group-films">
+          <p class="home-search-discover-label" id="home-search-discover-films-label">Films & séries</p>
           <div class="home-search-discover-films" id="home-search-discover-films"></div>
         </div>
-        <div class="home-search-discover-group">
+        <div class="home-search-discover-group" id="home-search-group-actors">
           <p class="home-search-discover-label">Acteurs</p>
           <div class="home-search-discover-people" id="home-search-discover-actors"></div>
         </div>
-        <div class="home-search-discover-group">
+        <div class="home-search-discover-group" id="home-search-group-directors">
           <p class="home-search-discover-label">Réalisateurs</p>
           <div class="home-search-discover-people" id="home-search-discover-directors"></div>
         </div>
@@ -295,7 +302,7 @@
     </div>
     <div class="f-bar">
       <button class="f-bar-toggle" id="f-bar-toggle">
-        <svg class="icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <svg class="icon-plus" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M451.5-131.5Q440-143 440-160v-280H160q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520h280v-280q0-17 11.5-28.5T480-840q17 0 28.5 11.5T520-800v280h280q17 0 28.5 11.5T840-480q0 17-11.5 28.5T800-440H520v280q0 17-11.5 28.5T480-120q-17 0-28.5-11.5Z"/></svg>
         <svg class="icon-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,18 9,12 15,6"/></svg>
       </button>
       <div class="f-bar-controls" id="f-bar-controls">
@@ -355,6 +362,10 @@
         <button class="sidebar-edit-btn" id="export-letterboxd-btn">
           <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
           Import / Export
+        </button>
+        <button class="sidebar-edit-btn sidebar-delete-btn hidden" id="sidebar-delete-list-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14px" height="14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Supprimer cette liste
         </button>
       </div>
       <section class="sidebar-section sidebar-display-prefs">
@@ -433,12 +444,12 @@
             <p class="modal-title" id="modal-title"></p>
             <div class="modal-year-row">
               <p class="modal-year" id="modal-year"></p>
+              <p class="modal-series-info" id="modal-series-info" hidden></p>
+              <p class="modal-duration" id="modal-duration" hidden></p>
+              <p class="modal-director" id="modal-director" hidden></p>
             </div>
-            <p class="modal-series-info" id="modal-series-info"></p>
-            <p class="modal-duration" id="modal-duration"></p>
-            <p class="modal-director" id="modal-director"></p>
             <div class="modal-actions-row">
-              <a class="modal-play-btn" id="modal-play-btn" target="_blank" rel="noopener noreferrer"><svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M320-273v-414q0-17 12-28.5t28-11.5q5 0 10.5 1.5T381-721l326 207q9 6 13.5 15t4.5 19q0 10-4.5 19T707-446L381-239q-5 3-10.5 4.5T360-233q-16 0-28-11.5T320-273Z"/></svg><span class="modal-link-label">Lecture</span></a>
+              <button type="button" class="modal-play-btn" id="modal-play-btn"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF"><path d="M320-273v-414q0-17 12-28.5t28-11.5q5 0 10.5 1.5T381-721l326 207q9 6 13.5 15t4.5 19q0 10-4.5 19T707-446L381-239q-5 3-10.5 4.5T360-233q-16 0-28-11.5T320-273Z"/></svg><span class="modal-link-label">Lecture</span></button>
               <div class="modal-actions">
                 <button class="modal-link modal-link-accent" id="modal-add-to-list-btn"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M120-240v-80h240v80H120Zm0-200v-80h400v80H120Zm0-200v-80h400v80H120Zm440 560v-160H400v-80h160v-160h80v160h160v80H640v160h-80Z"/></svg><span class="modal-link-label">Ajouter à une liste</span></button>
                 <a class="modal-link" id="modal-link" target="_blank" rel="noopener noreferrer"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M508.5-291.5Q520-303 520-320v-160q0-17-11.5-28.5T480-520q-17 0-28.5 11.5T440-480v160q0 17 11.5 28.5T480-280q17 0 28.5-11.5Zm0-320Q520-623 520-640t-11.5-28.5Q497-680 480-680t-28.5 11.5Q440-657 440-640t11.5 28.5Q463-600 480-600t28.5-11.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg><span class="modal-link-label">Informations</span></a>
@@ -523,6 +534,10 @@
           <button class="sidebar-edit-btn" id="sm-export-letterboxd-btn">
             <svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg>
             Import / Export
+          </button>
+          <button class="sidebar-edit-btn sidebar-delete-btn hidden" id="sm-sidebar-delete-list-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14px" height="14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Supprimer cette liste
           </button>
         </div>
         <section class="sidebar-section sidebar-display-prefs">
@@ -952,6 +967,26 @@
   </div>
 
   <!-- Modal confirmation suppression liste personnalisée -->
+  <!-- Modal choix de la source de lecture -->
+  <div class="admin-modal hidden" id="play-source-modal">
+    <div class="modal-box note-modal-box">
+      <div class="note-modal-header">
+        <h2 class="note-modal-title">Choisir une source</h2>
+        <button class="modal-close-btn" id="play-source-close">✕</button>
+      </div>
+      <div class="play-source-list">
+        <button class="play-source-btn" id="play-source-vo">
+          <span class="play-source-label">Source 1</span>
+          <span class="play-source-lang">VO</span>
+        </button>
+        <button class="play-source-btn" id="play-source-vf">
+          <span class="play-source-label">Source 2</span>
+          <span class="play-source-lang">VF</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="admin-modal hidden" id="delete-list-modal">
     <div class="modal-box note-modal-box">
       <div class="note-modal-header">
