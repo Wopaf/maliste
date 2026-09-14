@@ -1645,6 +1645,7 @@ async function addTmdbResultToList(tmdbId, type) {
     ]);
     if (arrName === 'films') films = [...films, { ...item, ...personal }];
     else series = [...series, { ...item, ...personal }];
+    showInfoToast("Ce titre a été ajouté au fil d'activité.");
   }
 
   if (!list.items[key]) {
@@ -2015,6 +2016,7 @@ function showUndoToast(message, onUndo) {
   textEl.textContent = message;
   toast.classList.add('visible');
 
+  undoBtn.classList.remove('hidden');
   const hide = () => toast.classList.remove('visible');
   undoBtn.onclick = () => {
     clearTimeout(_undoToastTimer);
@@ -2022,6 +2024,21 @@ function showUndoToast(message, onUndo) {
     onUndo();
   };
   _undoToastTimer = setTimeout(hide, 6000);
+}
+
+function showInfoToast(message) {
+  const toast   = document.getElementById('undo-toast');
+  const textEl  = document.getElementById('undo-toast-text');
+  const undoBtn = document.getElementById('undo-toast-btn');
+  if (!toast) return;
+
+  clearTimeout(_undoToastTimer);
+  textEl.textContent = message;
+  undoBtn.classList.add('hidden');
+  undoBtn.onclick = null;
+  toast.classList.add('visible');
+
+  _undoToastTimer = setTimeout(() => toast.classList.remove('visible'), 4000);
 }
 
 let _activityObserver = null;
@@ -3624,6 +3641,7 @@ async function toggleSeenStatus(item, arrName, isInSeenList) {
     ]);
     if (arrName === 'films') films  = [...films, { ...item, ...personal }];
     else                      series = [...series, { ...item, ...personal }];
+    showInfoToast("Ce titre a été ajouté au fil d'activité.");
   }
   refreshViews();
 }
@@ -3704,6 +3722,7 @@ async function copyItemToMyList(item, btn) {
     db.ref(`users/${currentUser.uid}/${arrName}/${key}`).set(personal),
     db.ref(`catalog/${arrName}/${key}`).update(extractSharedFields(item)),
   ]);
+  showInfoToast("Ce titre a été ajouté au fil d'activité.");
   btn.textContent = '✓ Copié !';
   btn.classList.add('copied');
   btn.onclick = null;
@@ -4666,6 +4685,9 @@ document.getElementById('entry-form').addEventListener('submit', e => {
     }
     entry.addedAt = new Date().toISOString();
     adminData[adminTab].push(entry);
+    if (adminTab === 'films' || adminTab === 'series' || adminTab === 'anime') {
+      showInfoToast("Ce titre a été ajouté au fil d'activité.");
+    }
   }
 
   closeAdminModal();
@@ -4788,6 +4810,9 @@ async function adminAddFromCatalog(entry) {
 
   const item = { ...entry, addedAt: new Date().toISOString() };
   adminData[adminTab].push(item);
+  if (adminTab === 'films' || adminTab === 'series' || adminTab === 'anime') {
+    showInfoToast("Ce titre a été ajouté au fil d'activité.");
+  }
   closeAdminModal();
   adminRenderList();
 
