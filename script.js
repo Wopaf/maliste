@@ -1494,37 +1494,6 @@ document.getElementById('delete-list-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeDeleteListModal();
 });
 
-function openPlaySourceModal() {
-  document.getElementById('play-source-modal').classList.remove('hidden', 'closing');
-}
-function closePlaySourceModal() {
-  const modal = document.getElementById('play-source-modal');
-  modal.classList.add('closing');
-  modal.addEventListener('animationend', () => {
-    modal.classList.add('hidden');
-    modal.classList.remove('closing');
-  }, { once: true });
-}
-document.getElementById('modal-play-btn').addEventListener('click', () => {
-  const playEl = document.getElementById('modal-play-btn');
-  if (!playEl.dataset.urlVo && !playEl.dataset.urlVf) return;
-  openPlaySourceModal();
-});
-document.getElementById('play-source-vo').addEventListener('click', () => {
-  const url = document.getElementById('modal-play-btn').dataset.urlVo;
-  if (url) window.open(url, '_blank', 'noopener,noreferrer');
-  closePlaySourceModal();
-});
-document.getElementById('play-source-vf').addEventListener('click', () => {
-  const url = document.getElementById('modal-play-btn').dataset.urlVf;
-  if (url) window.open(url, '_blank', 'noopener,noreferrer');
-  closePlaySourceModal();
-});
-document.getElementById('play-source-close').addEventListener('click', closePlaySourceModal);
-document.getElementById('play-source-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closePlaySourceModal();
-});
-
 function openListNameModal(listId = null) {
   _listNameModalTargetId = listId;
   const list  = listId ? customLists.find(l => l.id === listId) : null;
@@ -1630,23 +1599,8 @@ async function addTmdbResultToList(tmdbId, type) {
   const list = customLists.find(l => l.id === _listPickerTargetId);
   if (!list) return;
 
-  const item    = await fetchTmdbItem(tmdbId, type);
-  const key     = catalogKey(item.title);
-  const arrName = type === 'movie' ? 'films' : 'series';
-  const already = [...films, ...series, ...anime].some(i => catalogKey(i.title) === key);
-
-  if (!already) {
-    const personal = extractPersonalFields(item);
-    personal.addedAt = personal.addedAt || new Date().toISOString();
-    delete personal.stars;
-    await Promise.all([
-      db.ref(`users/${currentUser.uid}/${arrName}/${key}`).set(personal),
-      db.ref(`catalog/${arrName}/${key}`).update(extractSharedFields(item)),
-    ]);
-    if (arrName === 'films') films = [...films, { ...item, ...personal }];
-    else series = [...series, { ...item, ...personal }];
-    showInfoToast("Ce titre a été ajouté au fil d'activité.");
-  }
+  const item = await fetchTmdbItem(tmdbId, type);
+  const key  = catalogKey(item.title);
 
   if (!list.items[key]) {
     const snapshot = extractSharedFields(item);
@@ -3279,10 +3233,7 @@ const modalBackdrop = document.getElementById('modal-backdrop');
 const modalEl       = document.getElementById('modal-card');
 const modalClose    = document.getElementById('modal-close');
 
-let _modalOpenToken = 0;
-
 function openModal(item, triggerEl) {
-  const modalToken = ++_modalOpenToken;
   document.getElementById('modal-title').textContent = item.title;
   const yearEl = document.getElementById('modal-year');
   yearEl.textContent = item.year ?? '';
@@ -3385,38 +3336,6 @@ function openModal(item, triggerEl) {
   infoEl.href = item.tmdbId && item.tmdbType
     ? `https://www.themoviedb.org/${item.tmdbType}/${item.tmdbId}`
     : `https://www.google.com/search?q=${encodeURIComponent(item.title + ' site:themoviedb.org')}`;
-
-  const playEl = document.getElementById('modal-play-btn');
-  if (playEl) {
-    playEl.classList.add('hidden');
-    // number_of_episodes peut être 0/absent pour certaines séries (ex: à venir),
-    // donc on se fie d'abord à tmdbType plutôt qu'à la simple présence d'épisodes.
-    const isSeries = item.tmdbType ? item.tmdbType === 'tv' : !!item.episodes;
-    const bowdType = isSeries ? 'tv' : 'movie';
-    const setPlayUrls = (tmdbId) => {
-      const diacriticRe = new RegExp('[̀-ͯ]', 'g');
-      const slug = item.title
-        .normalize('NFD').replace(diacriticRe, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      playEl.dataset.urlVo = `https://aether.cx/media/tmdb-${bowdType}-${tmdbId}-${slug}`;
-      playEl.dataset.urlVf = `https://bowdtv.com/vod-player/${bowdType}/${tmdbId}`;
-      playEl.classList.remove('hidden');
-    };
-    if (item.tmdbId) {
-      setPlayUrls(item.tmdbId);
-    } else {
-      // Anciennes entrées ajoutées sans TMDB ID : on le retrouve par titre.
-      adminTmdbFetch(`/search/${bowdType}?query=${encodeURIComponent(item.title)}`)
-        .then(json => {
-          if (modalToken !== _modalOpenToken) return;
-          const match = json.results?.[0];
-          if (match) setPlayUrls(match.id);
-        })
-        .catch(() => {});
-    }
-  }
 
   const trailerEl = document.getElementById('modal-trailer');
   trailerEl.onclick = null;
